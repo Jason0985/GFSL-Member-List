@@ -36,7 +36,7 @@ async def update_driver_list(guild):
         return
 
     # Alle Mitglieder mit der Rolle filtern
-    drivers = [member.display_name for member in role.members]
+    drivers = [member.mention for member in role.members]
 
     if drivers:
         driver_text = "\n".join([f"• {name}" for name in drivers])
