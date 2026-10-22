@@ -8,6 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from gfsl import storage
+from gfsl.permissions import require_admin
 
 from . import data, drivers, flow, option_roles
 from .profile import ProfileModal
@@ -73,6 +74,19 @@ async def number_autocomplete(interaction: discord.Interaction, current: str) ->
     return [app_commands.Choice(name=f"#{n} – frei", value=n) for n in drivers.free_numbers(d, uid)[:25]]
 
 
+async def driver_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """Fahrer aus der Liste: „#13 ExHero1987“"""
+    d = data.get(interaction.guild_id)
+    choices = []
+    for uid, drv in sorted(d["drivers"].items(), key=lambda e: e[1].get("number") if isinstance(e[1].get("number"), int) else 9999):
+        member = interaction.guild.get_member(int(uid))
+        nr = f"#{drv['number']}" if isinstance(drv.get("number"), int) else "#–"
+        label = f"{nr} {member.display_name if member else drv.get('name') or uid}"
+        if current.lower().lstrip("#") in label.lower():
+            choices.append(app_commands.Choice(name=label[:100], value=uid))
+    return choices[:25]
+
+
 async def flag_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
     return [app_commands.Choice(name=f"{emoji} {name}", value=name)
             for name, emoji in FLAGS.items() if current.lower() in name.lower()][:25]
@@ -89,6 +103,12 @@ class VerifyCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._pending_refresh: dict[int, asyncio.Task] = {}
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        # Alles nur für Admins, außer /profil (jeder Fahrer für sich selbst)
+        if interaction.command and interaction.command.qualified_name == "profil":
+            return True
+        return require_admin(interaction)
 
     # ---------- Fahrerliste bei Rollenwechsel aktualisieren ----------
 
@@ -113,10 +133,19 @@ class VerifyCog(commands.Cog):
         d = data.get(after.guild.id)
         if str(after.id) not in d["drivers"]:
             return
-        watched = {rid for q in option_roles.mapped_questions(d["questions"]) if q["purpose"] in ("platform", "flag")
-                   for rid in q["option_roles"].values()}
         changed = {r.id for r in before.roles} ^ {r.id for r in after.roles}
-        if watched & changed:
+        drv = d["drivers"][str(after.id)]
+        relevant = False
+        for q in option_roles.mapped_questions(d["questions"]):
+            if q["purpose"] not in ("platform", "flag") or not changed & set(q["option_roles"].values()):
+                continue
+            relevant = True
+            # Rolle per Hand vergeben? Dann gilt sie als neue Plattform/Flagge (nur wenn eindeutig)
+            have = [o for o, rid in q["option_roles"].items() if after.get_role(rid)]
+            if len(have) == 1 and drv.get(q["purpose"]) != have[0]:
+                drv[q["purpose"]] = have[0]
+                storage.save()
+        if relevant:
             self.schedule_refresh(after.guild)
 
     # ---------- /profil (für Fahrer) ----------
@@ -349,6 +378,14 @@ class VerifyCog(commands.Cog):
                                        remove_others=bool(plattform or flagge))
         warnings += list(dict.fromkeys(report.errors))
         await interaction.followup.send(f"✅ {user.mention} ist jetzt **#{nummer}**." + "".join(f"\n⚠️ {w}" for w in warnings), ephemeral=True)
+
+    @fahrer.command(name="bearbeiten", description="Flagge, Plattform, Nummer und Name eines Fahrers nachtragen oder ändern")
+    @app_commands.describe(fahrer="Fahrer aus der Liste (zum Suchen tippen)")
+    @app_commands.autocomplete(fahrer=driver_autocomplete)
+    async def bearbeiten_fahrer(self, interaction: discord.Interaction, fahrer: str):
+        if fahrer not in data.get(interaction.guild_id)["drivers"]:
+            return await reply(interaction, "Diesen Fahrer gibt es nicht in der Liste. Bitte aus den Vorschlägen auswählen.")
+        await interaction.response.send_modal(ProfileModal(interaction.guild, int(fahrer), by_admin=True))
 
     @fahrer.command(name="entfernen", description="Fahrer austragen (Nummer wird frei)")
     async def fahrer_entfernen(self, interaction: discord.Interaction, user: discord.User):

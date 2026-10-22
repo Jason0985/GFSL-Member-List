@@ -34,9 +34,12 @@ class GFSLBot(commands.Bot):
         log.info("Eingeloggt als %s (ID: %s) auf %d Server(n)", self.user, self.user.id, len(self.guilds))
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        original = getattr(error, "original", error)
-        log.exception("Fehler in /%s", interaction.command and interaction.command.qualified_name, exc_info=original)
-        msg = f"⚠️ Fehler: {original}"
+        if isinstance(error, app_commands.CheckFailure):
+            msg = str(error) or "⛔ Dafür fehlt dir die Berechtigung."
+        else:
+            original = getattr(error, "original", error)
+            log.exception("Fehler in /%s", interaction.command and interaction.command.qualified_name, exc_info=original)
+            msg = f"⚠️ Fehler: {original}"
         if interaction.response.is_done():
             await interaction.followup.send(msg, ephemeral=True)
         else:

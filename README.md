@@ -68,12 +68,25 @@ Der Assistent führt in einer privaten Nachricht durch acht Schritte:
    13: 🇩🇪 @User (PC)
    ```
    Die Plattform kommt aus der Rolle des Fahrers (siehe „Rollen je Antwort“), sonst aus den gespeicherten Daten. Ändern sich die Rollen, aktualisiert sich die Liste nach ein paar Sekunden von selbst.
-5. **Rollen:** Rolle bei Freigabe, Rolle, die entfernt wird (z. B. Unverifiziert), und Mod-Rolle.
+5. **Rollen:** Rolle bei Freigabe, Rolle, die entfernt wird (z. B. Unverifiziert), und **Admin-Rolle zum Bearbeiten mit dem Bot** (siehe „Berechtigungen“).
 6. **Nickname & Nummern:** Vorlage wie `#{nummer} | {name}`, und Nummernbereich.
 7. **Fragen:** Standardfragen laden und mit **Testlauf** selbst ausprobieren.
 8. **Panel posten:** Postet den Start-Button (bzw. aktualisiert ihn) und baut die Fahrerliste auf.
 
 Mit `/verify setup schritt:` springst du direkt zu einem Schritt. Zu fehlenden Rechten in einem Kanal und zu Rollen, die über der Bot-Rolle stehen, zeigt der Assistent eine Warnung.
+
+## Berechtigungen
+
+| Wer | Darf |
+|---|---|
+| **Admins** = alle mit „Server verwalten“ **oder** der Admin-Rolle aus `/verify setup` (Schritt 5) | alle Befehle, Anträge akzeptieren/ablehnen |
+| **Verifizierte Fahrer** | nur `/profil` (eigene Flagge/Plattform) bzw. der Start-Button |
+| **Alle anderen** | nur der Start-Button zum Verifizieren |
+
+Der Bot prüft das bei jedem Befehl selbst. Fahrer sehen die Admin-Befehle gar nicht: Discord zeigt sie standardmäßig nur Leuten mit „Server verwalten“.
+**Hat deine Admin-Rolle kein „Server verwalten“?** Dann unter *Servereinstellungen → Integrationen → GFSL-Bot* bei `/verify`, `/fragen`, `/fahrer` und `/ersatzfahrer` die Admin-Rolle hinzufügen, damit die Admins die Befehle sehen.
+
+**Rollen beim Nachtragen:** Wählt jemand in `/profil` oder ein Admin in `/fahrer bearbeiten` eine Plattform, bekommt der Fahrer sofort die passende Rolle, und die Rolle der alten Plattform wird entfernt. Umgekehrt gilt auch: Wird eine Plattform-Rolle per Hand in Discord vergeben, übernimmt der Bot sie als Plattform und aktualisiert die Liste.
 
 ## Ablauf für den User
 
@@ -91,7 +104,7 @@ Die Akzeptieren/Ablehnen-Buttons und der Start-Button funktionieren auch nach ei
 
 ## Befehle
 
-Alle Befehle sind nur für Leute mit „Server verwalten“ sichtbar. Das kannst du unter *Servereinstellungen → Integrationen* anpassen.
+Alle Befehle außer `/profil` sind nur für Admins (siehe „Berechtigungen“).
 
 | Befehl | Was er macht |
 |---|---|
@@ -105,6 +118,7 @@ Alle Befehle sind nur für Leute mit „Server verwalten“ sichtbar. Das kannst
 | `/fragen rollen nr:` | Rollen je Antwort festlegen, z. B. PlayStation → @PS-Fahrer (siehe unten). |
 | `/fragen verschieben` / `entfernen` | Reihenfolge ändern bzw. Frage löschen. |
 | `/fragen standard` | Lädt die GFSL-Startfragen (ersetzt alle aktuellen). |
+| `/fahrer bearbeiten fahrer:` | Fahrer aus der Liste wählen und Flagge, Plattform, Nummer, Name nachtragen. Rollen und Nickname werden direkt angepasst. |
 | `/fahrer setzen` | Fahrer manuell eintragen oder Nummer ändern. Beim Tippen werden freie Nummern und Flaggen vorgeschlagen. |
 | `/fahrer entfernen` | Fahrer austragen, die Nummer wird wieder frei. |
 | `/fahrer rollen_sync` | Gibt allen eingetragenen Fahrern die Rollen passend zu ihrer Auswahl, auch nachträglich. |

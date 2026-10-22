@@ -5,19 +5,13 @@ import time
 import discord
 
 from gfsl import storage
+from gfsl.permissions import is_admin
 
 from . import data, drivers, option_roles
 from . import questions as Q
 from .constants import Colors
 
 log = logging.getLogger("gfsl.verify")
-
-
-def is_mod(interaction: discord.Interaction, d: dict) -> bool:
-    if interaction.permissions.manage_guild:
-        return True
-    rid = d["settings"]["mod_role_id"]
-    return bool(rid) and any(r.id == rid for r in getattr(interaction.user, "roles", []))
 
 
 def answer_of(app: dict, purpose: str):
@@ -88,7 +82,7 @@ class DecisionButton(discord.ui.DynamicItem[discord.ui.Button], template=r"gv:(?
     async def callback(self, interaction: discord.Interaction):
         d = data.get(interaction.guild_id)
         app = d["applications"].get(self.app_id)
-        if not is_mod(interaction, d):
+        if not is_admin(interaction):
             return await interaction.response.send_message("Dafür fehlt dir die Berechtigung.", ephemeral=True)
         if not app or app["status"] != "pending":
             return await interaction.response.send_message("Dieser Antrag wurde schon bearbeitet.", ephemeral=True)

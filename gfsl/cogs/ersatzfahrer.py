@@ -9,6 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from gfsl import storage
+from gfsl.permissions import require_admin
 
 log = logging.getLogger("gfsl.ersatzfahrer")
 
@@ -39,9 +40,14 @@ def migrate_legacy_config() -> None:
         log.info("Alte Einstellungen aus %s übernommen", LEGACY_CONFIG)
 
 
+@app_commands.default_permissions(manage_guild=True)
+@app_commands.guild_only()
 class Ersatzfahrer(commands.GroupCog, group_name="ersatzfahrer", group_description="Automatische Ersatzfahrer-Liste"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return require_admin(interaction)
 
     async def update_list(self, guild: discord.Guild):
         c = cfg(guild.id)
@@ -84,8 +90,6 @@ class Ersatzfahrer(commands.GroupCog, group_name="ersatzfahrer", group_descripti
             log.warning("Liste auf %s nicht aktualisiert: %s", guild.name, e)
 
     @app_commands.command(name="kanal", description="Kanal festlegen, in dem die Liste gepostet wird")
-    @app_commands.default_permissions(manage_guild=True)
-    @app_commands.guild_only()
     async def kanal(self, interaction: discord.Interaction, kanal: discord.TextChannel):
         c = cfg(interaction.guild_id)
         c["channel_id"] = kanal.id
@@ -95,8 +99,6 @@ class Ersatzfahrer(commands.GroupCog, group_name="ersatzfahrer", group_descripti
         await self.update_list(interaction.guild)
 
     @app_commands.command(name="rolle", description="Rolle festlegen, deren Mitglieder aufgelistet werden")
-    @app_commands.default_permissions(manage_guild=True)
-    @app_commands.guild_only()
     async def rolle(self, interaction: discord.Interaction, rolle: discord.Role):
         cfg(interaction.guild_id)["role_id"] = rolle.id
         storage.save()

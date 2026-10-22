@@ -20,7 +20,7 @@ DEFAULTS = {
         "list_message_ids": [],
         "verified_role_id": None,   # Rolle bei Freigabe
         "remove_role_id": None,     # Rolle, die bei Freigabe entfernt wird (z. B. "Unverifiziert")
-        "mod_role_id": None,        # darf Anträge bearbeiten (zusätzlich zu "Server verwalten")
+        "mod_role_id": None,        # Admin-Rolle: darf alles mit dem Bot (zusätzlich zu "Server verwalten"); Name bleibt für alte Daten
         "nickname_template": "{name}",
         "number_min": 1,
         "number_max": 99,

@@ -13,7 +13,7 @@ STEPS = [
     ("panel_text", "Start-Nachricht"),
     ("mod_channel", "Mod-Kanal"),
     ("list_channel", "Fahrerliste"),
-    ("roles", "Rollen"),
+    ("roles", "Rollen & Admin-Rolle"),
     ("numbers", "Nickname & Nummern"),
     ("questions", "Fragen"),
     ("finish", "Panel posten"),
@@ -55,7 +55,7 @@ def settings_overview(guild: discord.Guild, d: dict) -> str:
         f"**Fahrerliste:** {channel_status(guild, s['list_channel_id'], PERMS_LIST)}",
         f"**Rolle bei Freigabe:** {role_status(guild, s['verified_role_id'])}",
         f"**Rolle entfernen:** {role_status(guild, s['remove_role_id'])}",
-        f"**Mod-Rolle:** {role_status(guild, s['mod_role_id'], assigned=False)} (+ alle mit „Server verwalten“)",
+        f"**Admin-Rolle (darf alles mit dem Bot):** {role_status(guild, s['mod_role_id'], assigned=False)} (+ alle mit „Server verwalten“)",
         f"**Nickname-Vorlage:** `{s['nickname_template']}` → z. B. „{example}“",
         f"**Nummern:** {s['number_min']}–{s['number_max']}",
         f"**Fragen:** {len(d['questions'])}",
@@ -223,16 +223,19 @@ class SetupWizard(discord.ui.View):
     def step_roles(self, embed: discord.Embed):
         s = self.s
         embed.description = (
-            "Welche Rollen soll der Bot beim **Akzeptieren** verteilen? Alle drei sind optional, "
-            "zum Leeren die Auswahl im Menü entfernen.\n\n"
-            f"**Rolle bei Freigabe:** {role_status(self.guild, s['verified_role_id'])}\n"
-            f"**Rolle entfernen** (z. B. Unverifiziert): {role_status(self.guild, s['remove_role_id'])}\n"
-            f"**Mod-Rolle** (darf Anträge bearbeiten): {role_status(self.guild, s['mod_role_id'], assigned=False)}\n\n"
-            "Rollen je Antwort (z. B. PlayStation → @PS-Fahrer) stellst du mit `/fragen rollen` ein."
+            "**Beim Akzeptieren** einer Verifizierung (beide optional):\n"
+            f"• **Rolle bei Freigabe:** {role_status(self.guild, s['verified_role_id'])}\n"
+            f"• **Rolle entfernen** (z. B. Unverifiziert): {role_status(self.guild, s['remove_role_id'])}\n\n"
+            "**Admin-Rolle zum Bearbeiten mit dem Bot:**\n"
+            f"• {role_status(self.guild, s['mod_role_id'], assigned=False)}\n"
+            "Wer diese Rolle hat, darf **alles** mit dem Bot: alle Befehle, Anträge akzeptieren/ablehnen, Fahrer bearbeiten. "
+            "Alle anderen können nur sich selbst verifizieren und mit `/profil` ihre Flagge/Plattform eintragen. "
+            "Leute mit „Server verwalten“ dürfen immer alles, auch ohne diese Rolle.\n\n"
+            "Zum Leeren die Auswahl im Menü entfernen. Rollen je Antwort (z. B. PlayStation → @PS-Fahrer) stellst du mit `/fragen rollen` ein."
         )
         self.add_role_select("verified_role_id", "Rolle bei Freigabe …", 0)
         self.add_role_select("remove_role_id", "Rolle, die entfernt wird …", 1)
-        self.add_role_select("mod_role_id", "Mod-Rolle …", 2)
+        self.add_role_select("mod_role_id", "Admin-Rolle (darf alles mit dem Bot bearbeiten) …", 2)
 
     def step_numbers(self, embed: discord.Embed):
         s = self.s
