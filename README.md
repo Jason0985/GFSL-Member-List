@@ -242,7 +242,10 @@ Rollen und Nicknames werden beim Import **nicht** verändert. Die Plattform-Roll
 2. **Posten** zur eingestellten Zeit im Kanal der Vorlage, mit Ping der Rollen und den Buttons **Anmelden / Vielleicht / Abmelden**.
 3. **Übersicht:** Teams als Spalten mit Icons und Plätzen (`Ferrari (2/2)`), eine eigene Spalte für Ersatzfahrer, darunter *Vielleicht* und *Abgemeldet*. Gezählt wird angemeldet / vielleicht / abgemeldet, und „vielleicht“ zählt nicht als angemeldet.
 4. **Anmeldefrist:** Wer sich danach anmeldet, wird trotzdem eingetragen, bekommt aber eine **Q-Sperre**: Hinweis beim Klick, eine DM und ein ⏰ in der Übersicht.
-5. **Einteilung:** Zur Frist werden die angemeldeten Ersatzfahrer **zufällig** auf die freien Cockpits verteilt (freie Plätze = Plätze minus angemeldete Stammfahrer). Darunter erscheint eine Extra-Nachricht mit der Einteilung, der Warteliste und den Q-Sperren.
+5. **Einteilung:** Zur Frist werden die angemeldeten Ersatzfahrer auf die freien Cockpits verteilt (freie Plätze = Plätze minus angemeldete Stammfahrer).
+   - **Wer zuerst angemeldet ist, bekommt zuerst einen Platz.** In welches Team er kommt, ist zufällig.
+   - Wer keinen Platz bekommt, steht unten unter **„Keine Einteilung – alle Plätze belegt“** (in Anmelde-Reihenfolge) und rückt automatisch nach, wenn ein Platz frei wird.
+   - Darunter erscheint eine Extra-Nachricht mit der Einteilung, „Keine Einteilung“ und den Q-Sperren.
    - Meldet sich danach noch jemand an oder ab, wird automatisch nachgetragen, und die Betroffenen werden angepingt.
    - Stammfahrer auf „vielleicht“ zählen als nicht da, ihr Cockpit wird also vergeben.
 6. **Start des Rennens:** Die Anmeldung schließt, die Buttons verschwinden.

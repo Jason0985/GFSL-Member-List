@@ -172,7 +172,7 @@ async def post_assignment(guild: discord.Guild, d: dict, ev: dict, changes: list
         if new is not None:
             lines.append(f"🔁 <@{uid}> fährt jetzt für {teams[new]['emoji']} **{teams[new]['name']}**")
         else:
-            lines.append(f"⏳ <@{uid}> hat aktuell kein Cockpit mehr (Warteliste)")
+            lines.append(f"🚫 <@{uid}> hat keine Einteilung mehr – alle Plätze belegt")
     if lines:
         await channel.send("**Einteilung geändert:**\n" + "\n".join(lines), allowed_mentions=pings)
 

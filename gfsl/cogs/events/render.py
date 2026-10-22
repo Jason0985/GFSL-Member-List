@@ -76,7 +76,8 @@ def event_embed(guild: discord.Guild | None, d: dict, ev: dict) -> discord.Embed
             if s["class_id"] != res["id"]:
                 continue
             target = team_by_id.get(ev["assignments"].get(uid, {}).get("class_id"))
-            lines.append(entry(guild, uid, s, res["emoji"]) + (f" → {target['emoji']}" if target else ""))
+            marker = f" → {target['emoji']}" if target else (" 🚫" if ev.get("deadline_done") else "")
+            lines.append(entry(guild, uid, s, res["emoji"]) + marker)
         embed.add_field(name=f"{res['emoji']} {res['name']} ({len(lines)})"[:256], value=clip(lines), inline=True)
 
     for status, label in (("maybe", "❔ Vielleicht"), ("no", "❌ Abgemeldet")):
@@ -104,7 +105,9 @@ def assignment_embed(guild: discord.Guild | None, d: dict, ev: dict) -> discord.
     if not lines:
         lines.append("Keine freien Cockpits – alle Stammfahrer sind angemeldet.")
     if wait := assign.waiting(d, ev):
-        lines += ["", "⏳ **Ohne Cockpit (Warteliste):** " + ", ".join(f"<@{u}>" for u in wait)]
+        lines += ["", f"🚫 **Keine Einteilung – alle Plätze belegt ({len(wait)}):**"]
+        lines += [f"`{ev['signups'][u]['order']}` <@{u}>" for u in wait]
+        lines.append("-# Wird ein Platz frei, rückt der Nächste in Anmelde-Reihenfolge automatisch nach.")
     late = [uid for uid, s in sorted(ev["signups"].items(), key=lambda e: e[1]["order"]) if s["status"] == "yes" and s.get("late")]
     if late:
         lines += ["", "⏰ **Nach der Frist angemeldet (Q-Sperre):** " + ", ".join(f"<@{u}>" for u in late)]
