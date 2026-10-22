@@ -105,6 +105,10 @@ class PanelView(discord.ui.View):
 
 async def start(interaction: discord.Interaction, preview: bool = False):
     d = data.get(interaction.guild_id)
+    if not preview and str(interaction.user.id) in d["drivers"]:
+        # Schon verifiziert -> Flagge/Plattform nachtragen oder ändern
+        from .profile import ProfileModal  # profile importiert flow, daher erst hier
+        return await interaction.response.send_modal(ProfileModal(interaction.guild, interaction.user.id))
     if not preview and (reason := start_blocker(d, interaction.user.id)):
         return await interaction.response.send_message(reason, ephemeral=True)
     if preview and not d["questions"]:

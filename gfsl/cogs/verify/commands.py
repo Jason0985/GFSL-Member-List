@@ -1,4 +1,6 @@
 """Slash-Befehle des Verify-Moduls: /verify, /fragen, /fahrer"""
+import asyncio
+import logging
 import time
 
 import discord
@@ -8,6 +10,7 @@ from discord.ext import commands
 from gfsl import storage
 
 from . import data, drivers, flow, option_roles
+from .profile import ProfileModal
 from . import legacy_import as imp
 from . import questions as Q
 from .constants import MAX_QUESTIONS, Colors
@@ -35,6 +38,7 @@ PURPOSE_CHOICES = [
 STEP_CHOICES = [app_commands.Choice(name=f"{n + 1}. {name}", value=n) for n, (_, name) in enumerate(STEPS)]
 
 ADMIN = discord.Permissions(manage_guild=True)
+log = logging.getLogger("gfsl.verify")
 
 
 async def reply(interaction: discord.Interaction, content: str):
@@ -84,6 +88,45 @@ class VerifyCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._pending_refresh: dict[int, asyncio.Task] = {}
+
+    # ---------- Fahrerliste bei Rollenwechsel aktualisieren ----------
+
+    def schedule_refresh(self, guild: discord.Guild, delay: float = 10):
+        """Fasst viele Rollenänderungen kurz hintereinander zu einer Aktualisierung zusammen."""
+        if guild.id in self._pending_refresh:
+            return
+
+        async def run():
+            await asyncio.sleep(delay)
+            self._pending_refresh.pop(guild.id, None)
+            try:
+                await drivers.refresh_driver_list(guild, data.get(guild.id))
+            except (discord.HTTPException, RuntimeError) as e:
+                log.warning("Fahrerliste auf %s nicht aktualisiert: %s", guild.name, e)
+        self._pending_refresh[guild.id] = asyncio.create_task(run())
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
+        if before.roles == after.roles:
+            return
+        d = data.get(after.guild.id)
+        if str(after.id) not in d["drivers"]:
+            return
+        watched = {rid for q in option_roles.mapped_questions(d["questions"]) if q["purpose"] in ("platform", "flag")
+                   for rid in q["option_roles"].values()}
+        changed = {r.id for r in before.roles} ^ {r.id for r in after.roles}
+        if watched & changed:
+            self.schedule_refresh(after.guild)
+
+    # ---------- /profil (für Fahrer) ----------
+
+    @app_commands.command(name="profil", description="Deine Flagge und Plattform für die Fahrerliste eintragen oder ändern")
+    @app_commands.guild_only()
+    async def profil(self, interaction: discord.Interaction):
+        if str(interaction.user.id) not in data.get(interaction.guild_id)["drivers"]:
+            return await reply(interaction, "Du bist noch nicht verifiziert. Nutze dafür den Verifizierungs-Button.")
+        await interaction.response.send_modal(ProfileModal(interaction.guild, interaction.user.id))
 
     # ---------- /verify ----------
 
@@ -329,7 +372,35 @@ class VerifyCog(commands.Cog):
             return await reply(interaction, "Noch keine Rollen festgelegt. Erst mit `/fragen rollen` einstellen.")
         await interaction.response.defer(ephemeral=True, thinking=True)
         report = await option_roles.sync_all(interaction.guild, d, questions, andere_entfernen)
-        await interaction.followup.send(report.text()[:2000], ephemeral=True)
+        err = await self.refresh_list(interaction.guild, d)
+        await interaction.followup.send(report.text()[:1900] + (f"\n⚠️ {err}" if err else ""), ephemeral=True)
+
+    @fahrer.command(name="fehlende_angaben", description="Zeigt, bei welchen Fahrern Flagge oder Plattform fehlt")
+    @app_commands.describe(oeffentlich="In den Kanal posten und die Fahrer anpingen, damit sie es mit /profil nachtragen")
+    async def fehlende_angaben(self, interaction: discord.Interaction, oeffentlich: bool = False):
+        d = data.get(interaction.guild_id)
+        lines = []
+        for uid, drv in sorted(d["drivers"].items(), key=lambda e: e[1].get("number") if isinstance(e[1].get("number"), int) else 9999):
+            missing = [label for key, label in (("flag", "Flagge"), ("platform", "Plattform"))
+                       if not drivers.profile_value(d, interaction.guild, uid, key)]
+            if missing and interaction.guild.get_member(int(uid)):
+                lines.append(f"<@{uid}>: {', '.join(missing)}")
+        if not lines:
+            return await reply(interaction, "✅ Bei allen Fahrern sind Flagge und Plattform eingetragen.")
+        head = (f"**Bei {len(lines)} Fahrer(n) fehlt noch etwas für die Fahrerliste.** "
+                "Bitte mit `/profil` nachtragen (oder auf den Verifizierungs-Button klicken):")
+        chunks, cur = [], head
+        for line in lines:
+            if len(cur) + len(line) + 1 > 1900:
+                chunks.append(cur)
+                cur = ""
+            cur += "\n" + line
+        chunks.append(cur)
+        if not oeffentlich:
+            return await interaction.response.send_message(chunks[0], ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
+        await interaction.response.send_message("📣 Wird gepostet …", ephemeral=True)
+        for chunk in chunks:
+            await interaction.channel.send(chunk, allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False))
 
     @fahrer.command(name="nummern", description="Übersicht aller Nummern: frei und vergeben")
     @app_commands.describe(oeffentlich="Für alle sichtbar in den Kanal posten")

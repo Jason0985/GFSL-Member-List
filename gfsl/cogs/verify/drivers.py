@@ -65,34 +65,48 @@ async def set_nickname(member: discord.Member, template: str, drv: dict) -> str 
     return None
 
 
-def driver_text(uid: str, drv: dict) -> str:
-    """„🇩🇪 @User Wenig-Luca (PlayStation)“"""
-    parts = [lookup_flag(drv.get("flag")), f"<@{uid}>", discord.utils.escape_markdown(drv.get("name") or "")]
-    if drv.get("platform"):
-        parts.append(f"({discord.utils.escape_markdown(drv['platform'])})")
+def profile_value(d: dict, guild: discord.Guild | None, uid: str, key: str) -> str | None:
+    """Plattform bzw. Flagge eines Fahrers. Sind der Frage Rollen zugeordnet (/fragen rollen), zählt die Rolle,
+    die er gerade hat. Sonst der gespeicherte Wert (Formular, Import, /profil, /fahrer setzen)."""
+    q = next((q for q in d["questions"] if q["purpose"] == key and q.get("option_roles")), None)
+    member = guild.get_member(int(uid)) if q and guild else None
+    if member:
+        for option, role_id in q["option_roles"].items():
+            if member.get_role(role_id):
+                return option
+    return d["drivers"].get(uid, {}).get(key)
+
+
+def driver_text(uid: str, flag: str | None, platform: str | None) -> str:
+    """„🇩🇪 @User (PC)“"""
+    parts = [lookup_flag(flag), f"<@{uid}>"]
+    if platform:
+        parts.append(f"({discord.utils.escape_markdown(platform)})")
     return " ".join(p for p in parts if p)
 
 
-def driver_line(uid: str, drv: dict) -> str:
+def driver_line(uid: str, drv: dict, d: dict | None = None, guild: discord.Guild | None = None) -> str:
     nr = drv["number"] if isinstance(drv.get("number"), int) else "–"
-    return f"{nr}: {driver_text(uid, drv)}"
+    if d is None:
+        return f"{nr}: {driver_text(uid, drv.get('flag'), drv.get('platform'))}"
+    return f"{nr}: {driver_text(uid, profile_value(d, guild, uid, 'flag'), profile_value(d, guild, uid, 'platform'))}"
 
 
-def list_lines(d: dict) -> list[str]:
-    """Alle Nummern untereinander: frei = leer, vergeben = Fahrer."""
+def list_lines(d: dict, guild: discord.Guild | None = None) -> list[str]:
+    """Alle Nummern untereinander: frei = leer, vergeben = Flagge @User (Plattform)."""
     s = d["settings"]
     by_number = {drv["number"]: uid for uid, drv in d["drivers"].items() if isinstance(drv.get("number"), int)}
     lines = []
     for n in range(s["number_min"], s["number_max"] + 1):
         if n in by_number:
-            lines.append(f"{n}: {driver_text(by_number[n], d['drivers'][by_number[n]])}")
+            lines.append(driver_line(by_number[n], d["drivers"][by_number[n]], d, guild))
         else:
             lines.append(f"{n}:")
     # Fahrer ohne Nummer oder außerhalb des Bereichs nicht verschlucken
     rest = [(uid, drv) for uid, drv in d["drivers"].items()
             if not isinstance(drv.get("number"), int) or not s["number_min"] <= drv["number"] <= s["number_max"]]
     if rest:
-        lines += ["", "**Ohne Nummer / außerhalb des Bereichs:**"] + [driver_line(uid, drv) for uid, drv in rest]
+        lines += ["", "**Ohne Nummer / außerhalb des Bereichs:**"] + [driver_line(uid, drv, d, guild) for uid, drv in rest]
     return lines
 
 
@@ -104,7 +118,7 @@ async def refresh_driver_list(guild: discord.Guild, d: dict) -> None:
     if channel is None:
         raise RuntimeError("Listen-Kanal nicht gefunden.")
 
-    lines = list_lines(d)
+    lines = list_lines(d, guild)
 
     # Aufteilen, falls die Liste für eine Nachricht zu lang wird
     chunks: list[str] = []

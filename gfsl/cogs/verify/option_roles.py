@@ -10,6 +10,7 @@ import discord
 
 from gfsl import storage
 
+from . import drivers
 from . import questions as Q
 from .constants import Colors
 from .flags import lookup_flag
@@ -129,6 +130,13 @@ async def sync_all(guild: discord.Guild, d: dict, questions: list[dict], remove_
     return report
 
 
+async def refresh_list_quietly(guild: discord.Guild, d: dict) -> None:
+    try:
+        await drivers.refresh_driver_list(guild, d)
+    except (discord.HTTPException, RuntimeError):
+        pass
+
+
 def role_warning(guild: discord.Guild, role: discord.Role | None) -> str:
     if role and (role >= guild.me.top_role or role.managed):
         return " ⚠️ steht über meiner Bot-Rolle"
@@ -204,12 +212,14 @@ class OptionRolesView(discord.ui.View):
                 mapping.pop(self.option, None)
             storage.save()
             await self.refresh(i, "✅ Gespeichert.")
+            await refresh_list_quietly(self.guild, self.d)  # Plattform in der Liste kommt aus den Rollen
         role_select.callback = on_role
         self.add_item(role_select)
 
         async def apply(i: discord.Interaction):
             await i.response.defer()
             report = await sync_all(self.guild, self.d, [self.q], remove_others=False)
+            await refresh_list_quietly(self.guild, self.d)
             self.note = report.text()[:1500]
             await i.edit_original_response(embed=self.render(), view=self)
         button = discord.ui.Button(label="Auf alle Fahrer anwenden", style=discord.ButtonStyle.primary, emoji="🔁",

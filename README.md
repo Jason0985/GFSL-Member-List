@@ -21,6 +21,8 @@ gfsl/
       commands.py           Slash-Befehle /verify, /fragen, /fahrer
       setup_wizard.py       /verify setup: Einrichtung Schritt für Schritt
       flow.py               Ablauf für den User: Start-Button → Formular → Overlay → Abschicken
+      profile.py            /profil: verifizierte Fahrer tragen Flagge und Plattform selbst nach
+      option_roles.py       Rollen je Antwort (z. B. Plattform-Rollen)
       review.py             Mod-Kanal: Antrag mit Akzeptieren/Ablehnen
       drivers.py            Fahrernummern, Nicknames, Fahrerliste
       questions.py          Fragetypen, Prüfung, Standardfragen
@@ -63,8 +65,9 @@ Der Assistent führt in einer privaten Nachricht durch acht Schritte:
 4. **Fahrerliste:** Kanal für die automatische Liste. Dort stehen alle Nummern untereinander:
    ```
    11:                       ← frei
-   13: 🇩🇪 @User Wenig-Luca (PlayStation)
+   13: 🇩🇪 @User (PC)
    ```
+   Die Plattform kommt aus der Rolle des Fahrers (siehe „Rollen je Antwort“), sonst aus den gespeicherten Daten. Ändern sich die Rollen, aktualisiert sich die Liste nach ein paar Sekunden von selbst.
 5. **Rollen:** Rolle bei Freigabe, Rolle, die entfernt wird (z. B. Unverifiziert), und Mod-Rolle.
 6. **Nickname & Nummern:** Vorlage wie `#{nummer} | {name}`, und Nummernbereich.
 7. **Fragen:** Standardfragen laden und mit **Testlauf** selbst ausprobieren.
@@ -81,6 +84,8 @@ Mit `/verify setup schritt:` springst du direkt zu einem Schritt. Zu fehlenden R
 5. Der Antrag landet im **Mod-Kanal**, mit Screenshots als Anhang und einer Vorschau der Nummer („Wunsch #17 belegt → bekommt #18“, falls die Nummer inzwischen weg ist).
 6. **Akzeptieren:** Der Bot setzt den Nickname, vergibt bzw. entfernt die Rollen, trägt die Nummer ein, aktualisiert die Fahrerliste und schickt dem User eine DM.
    **Ablehnen:** Der Mod gibt optional einen Grund an, und der User bekommt ihn per DM.
+
+**Schon verifiziert?** Ein Klick auf den Start-Button (oder `/profil`) öffnet einen Dialog, in dem man **Flagge und Plattform** nachtragen oder ändern kann. Die Plattform-Rolle wird dabei direkt angepasst.
 
 Die Akzeptieren/Ablehnen-Buttons und der Start-Button funktionieren auch nach einem Neustart. Ein halb ausgefülltes Formular geht beim Neustart allerdings verloren, dann einfach neu starten.
 
@@ -103,6 +108,8 @@ Alle Befehle sind nur für Leute mit „Server verwalten“ sichtbar. Das kannst
 | `/fahrer setzen` | Fahrer manuell eintragen oder Nummer ändern. Beim Tippen werden freie Nummern und Flaggen vorgeschlagen. |
 | `/fahrer entfernen` | Fahrer austragen, die Nummer wird wieder frei. |
 | `/fahrer rollen_sync` | Gibt allen eingetragenen Fahrern die Rollen passend zu ihrer Auswahl, auch nachträglich. |
+| `/fahrer fehlende_angaben` | Zeigt, wem Flagge oder Plattform fehlt. Mit `oeffentlich:True` werden die Fahrer im Kanal angepingt, damit sie `/profil` nutzen. |
+| `/profil` | Für Fahrer: Flagge und Plattform eintragen oder ändern. |
 | `/fahrer nummern` | Übersicht aller Nummern (frei, vergeben), optional öffentlich. |
 | `/fahrer aktualisieren` | Fahrerliste neu aufbauen. |
 | `/fahrer export` | Alle Fahrer als CSV (Excel). |
