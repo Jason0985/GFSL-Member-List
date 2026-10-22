@@ -55,10 +55,14 @@ class TemplateEditor(discord.ui.View):
         pings = " ".join(f"<@&{r}>" for r in t["ping_role_ids"]) or "— (niemand, im Menü unten auswählen)"
         review = (f"an – DM {t['review_hours']} h vor dem Posten an <@{t['reminder_user_id']}>"
                   if t["review"] else "aus – wird automatisch gepostet")
-        nudge = f"{t['nudge_hours']} h vor der Frist werden Fahrer ohne Rückmeldung angepingt" if t["nudge_hours"] else "aus"
+        info_channel = self.guild.get_channel(t["info_channel_id"] or 0)
+        remind = (days_text(t["remind_days_before"], t["remind_time"]) if t["remind_days_before"] is not None else "aus")
         lines = [
-            f"**Kanal:** {channel.mention if channel else '❌ nicht gesetzt'}",
-            f"**Pingt:** {pings}",
+            f"**Anmeldung im Kanal:** {channel.mention if channel else '❌ nicht gesetzt'}",
+            f"**Info-Nachrichten im Kanal:** {info_channel.mention if info_channel else 'derselbe wie die Anmeldung'}",
+            f"**Info-Nachrichten erwähnen:** {pings}",
+            f"**📢 Info beim Posten** („Anmeldung ist offen“): {'an' if t['announce'] else 'aus'}",
+            f"**⏰ Anmelde-Erinnerung:** {remind}",
             f"**Titel (Standard):** {t['title']}",
             f"**Beschreibung:** {(t['description'][:300] + ('…' if len(t['description']) > 300 else '')) or '—'}",
             f"**Bild:** {'✅' if t['image'] else '—'} (ändern mit `/vorlage bild`)",
@@ -66,7 +70,6 @@ class TemplateEditor(discord.ui.View):
             f"**Gepostet:** {days_text(t['post_days_before'], t['post_time'])}",
             f"**Anmeldefrist:** {days_text(t['deadline_days_before'], t['deadline_time'])} – danach Q-Sperre und Einteilung der Ersatzfahrer",
             f"**Freigabe vor dem Posten:** {review}",
-            f"**Erinnerung an Fahrer:** {nudge}",
         ]
         embed = discord.Embed(color=0x3B82F6, title=f"📋 Vorlage „{t['name']}“",
                               description=(f"{self.note}\n\n" if self.note else "") + "\n".join(lines))
@@ -82,7 +85,7 @@ class TemplateEditor(discord.ui.View):
         channel_select.callback = on_channel
         self.add_item(channel_select)
 
-        roles = discord.ui.RoleSelect(placeholder="Rollen, die beim Posten gepingt werden …", row=1, min_values=0, max_values=10,
+        roles = discord.ui.RoleSelect(placeholder="Rollen, die in Info + Erinnerung erwähnt werden …", row=1, min_values=0, max_values=10,
                                       default_values=[discord.Object(r) for r in t["ping_role_ids"]])
 
         async def on_roles(i):
@@ -102,9 +105,20 @@ class TemplateEditor(discord.ui.View):
         reviewer.callback = on_reviewer
         self.add_item(reviewer)
 
+        info_select = discord.ui.ChannelSelect(channel_types=TEXT_CHANNELS, row=3, min_values=0, max_values=1,
+                                               placeholder="Kanal für Info + Erinnerung (leer = wie Anmeldung) …",
+                                               default_values=[discord.Object(t["info_channel_id"])] if t["info_channel_id"] else [])
+
+        async def on_info_channel(i):
+            self.t["info_channel_id"] = info_select.values[0].id if info_select.values else None
+            storage.save()
+            await self.refresh(i, "✅ Gespeichert.")
+        info_select.callback = on_info_channel
+        self.add_item(info_select)
+
         for label, emoji, callback in (("Texte & Zeiten", "✏️", self.open_texts), ("Freigabe & Erinnerungen", "⏰", self.open_reminders),
                                        ("Vorschau", "👁️", self.preview)):
-            b = discord.ui.Button(label=label, emoji=emoji, style=discord.ButtonStyle.primary if emoji == "✏️" else discord.ButtonStyle.secondary, row=3)
+            b = discord.ui.Button(label=label, emoji=emoji, style=discord.ButtonStyle.primary if emoji == "✏️" else discord.ButtonStyle.secondary, row=4)
             b.callback = callback
             self.add_item(b)
         return embed
@@ -121,6 +135,9 @@ class TemplateEditor(discord.ui.View):
                   "content": "👁️ So sieht eine Anmeldung mit dieser Vorlage aus (Titel kommt pro Rennen aus dem Kalender):"}
         if file := D.image_file(self.t["image"]):
             kwargs["file"] = file
+        kwargs["embeds"] = [kwargs.pop("embed"), render.info_embed(None, self.d, ev, "open")]
+        if self.t.get("remind_days_before") is not None:
+            kwargs["embeds"].append(render.info_embed(None, self.d, ev, "remind"))
         await interaction.response.send_message(**kwargs)
 
 
@@ -167,16 +184,33 @@ class RemindersModal(discord.ui.Modal, title="Freigabe & Erinnerungen"):
             discord.RadioGroupOption(label="Nein – automatisch posten", value="0", default=not t["review"]),
         ])
         self.review_hours = discord.ui.TextInput(default=str(t["review_hours"]), max_length=3)
-        self.nudge_hours = discord.ui.TextInput(default=str(t["nudge_hours"]), max_length=3)
+        self.announce = discord.ui.RadioGroup(options=[
+            discord.RadioGroupOption(label="Ja – Info „Anmeldung ist offen“ mit Erwähnungen", value="1", default=t["announce"]),
+            discord.RadioGroupOption(label="Nein", value="0", default=not t["announce"]),
+        ])
+        self.remind = discord.ui.TextInput(required=False, max_length=10, placeholder="1 18:00",
+                                           default=f"{t['remind_days_before']} {t['remind_time']}" if t["remind_days_before"] is not None else None)
         self.add_item(discord.ui.Label(text="Freigabe per DM vor dem Posten?", component=self.review))
         self.add_item(discord.ui.Label(text="DM so viele Stunden vor dem Posten", component=self.review_hours))
-        self.add_item(discord.ui.Label(text="Fahrer ohne Rückmeldung anpingen", description="Stunden vor der Anmeldefrist, 0 = aus",
-                                       component=self.nudge_hours))
+        self.add_item(discord.ui.Label(text="Beim Posten Info senden?", component=self.announce))
+        self.add_item(discord.ui.Label(text="Anmelde-Erinnerung: Tage vorher + Uhrzeit",
+                                       description="z. B. 1 18:00 = am Tag vor dem Rennen um 18 Uhr · leer = aus", component=self.remind))
 
     async def on_submit(self, interaction: discord.Interaction):
-        if not (self.review_hours.value.strip().isdigit() and self.nudge_hours.value.strip().isdigit()):
+        if not self.review_hours.value.strip().isdigit():
             return await self.editor.refresh(interaction, "❌ Stunden bitte als ganze Zahl eingeben.")
+        t = {**D.TEMPLATE_DEFAULTS, **self.editor.t}
+        remind_days, remind_time = None, t["remind_time"]
+        if self.remind.value.strip():
+            try:
+                remind_days, remind_time = tu.parse_offset(self.remind.value)
+            except ValueError as e:
+                return await self.editor.refresh(interaction, f"❌ Anmelde-Erinnerung: {e}")
+            after_post = remind_days < t["post_days_before"] or (remind_days == t["post_days_before"] and remind_time > t["post_time"])
+            before_deadline = remind_days > t["deadline_days_before"] or (remind_days == t["deadline_days_before"] and remind_time < t["deadline_time"])
+            if not (after_post and before_deadline):
+                return await self.editor.refresh(interaction, "❌ Die Anmelde-Erinnerung muss nach dem Posten und vor der Anmeldefrist liegen.")
         self.editor.t.update(review=self.review.value != "0", review_hours=int(self.review_hours.value),
-                             nudge_hours=int(self.nudge_hours.value))
+                             announce=self.announce.value != "0", remind_days_before=remind_days, remind_time=remind_time)
         storage.save()
         await self.editor.refresh(interaction, "✅ Gespeichert.")

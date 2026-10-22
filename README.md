@@ -211,13 +211,14 @@ Rollen und Nicknames werden beim Import **nicht** verändert. Die Plattform-Roll
 
 - **Klassen** sind die Rollen, mit denen man sich anmelden kann. Beim Anmelden schaut der Bot, welche Rolle der Fahrer hat, und sortiert ihn in die passende Spalte. Teams kommen vor Ersatzfahrern. Server-Emojis gehen als Icon (`:ferrari:` im Befehl tippen).
 - In der **Vorlage** steht alles, was bei jedem Rennen gleich ist:
-  - Kanal und Rollen, die gepingt werden
+  - Kanal der Anmeldung, Kanal für Info + Erinnerung (leer = derselbe) und Rollen, die dort erwähnt werden
   - Beschreibung und Bild (`/vorlage bild`)
   - Uhrzeit des Rennens
   - wann gepostet wird, z. B. „3 Tage vorher um 10:00“
   - Anmeldefrist, z. B. „am Renntag um 15:00“
   - Freigabe per DM: ja/nein, wer die DM bekommt und wie viele Stunden vorher
-  - Erinnerung an Fahrer ohne Rückmeldung (optional)
+  - 📢 Info beim Posten „Anmeldung ist offen“ (an/aus)
+  - ⏰ Anmelde-Erinnerung, z. B. „1 18:00“ = am Tag vor dem Rennen um 18 Uhr (leer = aus)
 - **Vorschau** im Vorlagen-Editor zeigt, wie die Anmeldung aussieht.
 
 ### 2. Season / Kalender
@@ -239,7 +240,9 @@ Rollen und Nicknames werden beim Import **nicht** verändert. Die Plattform-Roll
 ### 3. Was automatisch passiert
 
 1. **Freigabe** (wenn in der Vorlage an): Vor dem Posten bekommst du eine **DM mit Vorschau** und den Buttons *Bearbeiten & freigeben*, *So freigeben* und *Diese Woche aussetzen*. **Ohne Freigabe wird nichts gepostet.** Zum Post-Zeitpunkt kommt noch einmal eine Erinnerung. Sobald du freigibst, wird sofort gepostet.
-2. **Posten** zur eingestellten Zeit im Kanal der Vorlage, mit Ping der Rollen und den Buttons **Anmelden / Vielleicht / Abmelden**.
+2. **Posten** zur eingestellten Zeit im Kanal der Vorlage, mit den Buttons **Anmelden / Vielleicht / Abmelden** (die Anmeldung selbst pingt niemanden).
+   Gleichzeitig kommt im Info-Kanal die Nachricht **„📢 Die Anmeldung für … ist offen!“** mit den eingestellten @-Rollen, Rennzeit, Frist und Link zur Anmeldung.
+   Zur eingestellten Zeit folgt einmal die **„⏰ Erinnerung“**, ebenfalls mit @-Rollen, Link und der bisherigen Zahl der Anmeldungen. Liegt die Frist schon hinter uns, entfällt sie.
 3. **Übersicht:** Teams als Spalten mit Icons und Plätzen (`Ferrari (2/2)`), eine eigene Spalte für Ersatzfahrer, darunter *Vielleicht* und *Abgemeldet*. Gezählt wird angemeldet / vielleicht / abgemeldet, und „vielleicht“ zählt nicht als angemeldet.
 4. **Anmeldefrist:** Wer sich danach anmeldet, wird trotzdem eingetragen, bekommt aber eine **Q-Sperre**: Hinweis beim Klick, eine DM und ein ⏰ in der Übersicht.
 5. **Einteilung:** Zur Frist werden die angemeldeten Ersatzfahrer auf die freien Cockpits verteilt (freie Plätze = Plätze minus angemeldete Stammfahrer).

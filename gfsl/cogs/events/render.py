@@ -13,9 +13,11 @@ NONE = "–"
 
 def times(d: dict, ev: dict) -> dict:
     t = D.template_of(d, ev)
+    remind = None if t["remind_days_before"] is None else tu.offset(ev["starts_at"], t["remind_days_before"], t["remind_time"])
     return {
         "start": tu.from_str(ev["starts_at"]),
         "post": tu.offset(ev["starts_at"], t["post_days_before"], t["post_time"]),
+        "remind": remind,
         "deadline": tu.offset(ev["starts_at"], t["deadline_days_before"], t["deadline_time"]),
     }
 
@@ -132,6 +134,30 @@ def event_embed(guild: discord.Guild | None, d: dict, ev: dict, hover: bool = Tr
     if hover and len(embed) > 5900:
         return event_embed(guild, d, ev, hover=False)
     return embed
+
+
+def info_embed(guild: discord.Guild | None, d: dict, ev: dict, kind: str) -> discord.Embed:
+    """Info beim Posten („Anmeldung ist offen“) bzw. Anmelde-Erinnerung, mit Link zur Anmeldung."""
+    t = times(d, ev)
+    c = counts(ev)
+    title = D.field(d, ev, "title")
+    start_ts, deadline_ts = int(t["start"].timestamp()), int(t["deadline"].timestamp())
+    link = (f"https://discord.com/channels/{guild.id}/{ev['channel_id']}/{ev['message_id']}"
+            if guild and ev.get("message_id") else None)
+    if kind == "open":
+        head = f"## 📢 Die Anmeldung für {title} ist offen!"
+        color = 0x22C55E
+    else:
+        head = f"## ⏰ Erinnerung: Anmeldung für {title}"
+        color = 0xF59E0B
+    lines = [head, "",
+             f"🏁 Rennen: **<t:{start_ts}:F>**",
+             f"📝 Anmeldefrist: **<t:{deadline_ts}:f>** (<t:{deadline_ts}:R>)"]
+    if kind == "remind":
+        lines.append(f"👥 Bisher **{c['yes']}** angemeldet – noch nicht dabei? Jetzt an- oder abmelden!")
+    if link:
+        lines += ["", f"➡️ **[Zur Anmeldung]({link})**"]
+    return discord.Embed(color=color, description="\n".join(lines))
 
 
 def assignment_embed(guild: discord.Guild | None, d: dict, ev: dict) -> discord.Embed:

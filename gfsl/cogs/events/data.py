@@ -27,14 +27,16 @@ TEMPLATE_DEFAULTS = {
     "title": "Rennen",
     "description": "",
     "image": None,                  # {"file": "..."} (vom Bot gespeichert) oder {"url": "..."}
-    "channel_id": None,
-    "ping_role_ids": [],
+    "channel_id": None,             # hier steht die Anmeldung
+    "info_channel_id": None,        # hier kommen Info + Erinnerung (leer = derselbe Kanal wie die Anmeldung)
+    "ping_role_ids": [],            # werden in Info + Erinnerung erwähnt
+    "announce": True,               # beim Posten Info „Anmeldung ist offen“ senden
+    "remind_days_before": None, "remind_time": "18:00",   # Anmelde-Erinnerung (None = aus)
     "event_time": "20:00",
     "post_days_before": 3, "post_time": "10:00",          # wann die Anmeldung gepostet wird
     "deadline_days_before": 0, "deadline_time": "15:00",  # Anmeldefrist (danach Q-Sperre + Einteilung)
     "review": True,                 # vor dem Posten Freigabe per DM nötig
     "review_hours": 24,             # so viele Stunden vor dem Posten kommt die DM
-    "nudge_hours": 0,               # so viele Stunden vor der Frist: Fahrer ohne Rückmeldung anpingen (0 = aus)
     "reminder_user_id": None,
 }
 
@@ -75,7 +77,7 @@ def new_event(d: dict, template: dict, starts_at: str, title: str | None, user_i
     ev = {
         "id": eid, "template_id": template["id"], "title": title, "description": None, "image": None,
         "starts_at": starts_at, "status": "planned", "confirmed": not template["review"],
-        "review_sent": False, "overdue_sent": False, "nudge_done": False, "deadline_done": False,
+        "review_sent": False, "overdue_sent": False, "deadline_done": False, "remind_done": False,
         "channel_id": None, "message_id": None, "assignment_message_id": None,
         "signups": {},        # user_id -> {status: yes|maybe|no, class_id, name, at, order, late}
         "assignments": {},    # user_id (Ersatzfahrer) -> {class_id, at}

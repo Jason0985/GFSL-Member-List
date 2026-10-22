@@ -95,9 +95,12 @@ async def rescheduled(guild: discord.Guild, d: dict, ev: dict):
         for s in ev["signups"].values():
             if s["status"] == "yes":
                 s["late"] = s["at"] >= deadline.timestamp()
+        remind = render.times(d, ev)["remind"]
+        if remind and tu.now() < remind:
+            ev["remind_done"] = False  # Erinnerung liegt wieder in der Zukunft
         if tu.now() < deadline and ev["deadline_done"]:
             # Frist liegt wieder in der Zukunft: Einteilung erst zur neuen Frist
-            ev["deadline_done"] = ev["nudge_done"] = False
+            ev["deadline_done"] = False
             ev["assignments"] = {}
             channel = guild.get_channel(ev.get("channel_id") or 0)
             if channel and ev.get("assignment_message_id"):
@@ -234,9 +237,8 @@ async def post(guild: discord.Guild, d: dict, ev: dict) -> str:
     ev["status"] = "posted"
     ev["confirmed"] = True
     ev["channel_id"] = channel.id
-    content = " ".join(f"<@&{r}>" for r in t["ping_role_ids"]) or None
-    kwargs = {"content": content, "embed": render.event_embed(guild, d, ev), "view": signup_view(ev["id"]),
-              "allowed_mentions": discord.AllowedMentions(roles=True, users=False, everyone=False)}
+    # Die Anmeldung selbst pingt niemanden – das macht die Info-Nachricht
+    kwargs = {"embed": render.event_embed(guild, d, ev), "view": signup_view(ev["id"])}
     if file := D.image_file(D.field(d, ev, "image")):
         kwargs["file"] = file
     try:
@@ -246,7 +248,27 @@ async def post(guild: discord.Guild, d: dict, ev: dict) -> str:
         return f"❌ Posten fehlgeschlagen: {e.text or e}"
     ev["message_id"] = msg.id
     storage.save()
-    return f"✅ Gepostet in {channel.mention}: {msg.jump_url}"
+    result = f"✅ Gepostet in {channel.mention}: {msg.jump_url}"
+    if t["announce"]:
+        if err := await send_info(guild, d, ev, "open"):
+            result += f"\n⚠️ {err}"
+    return result
+
+
+async def send_info(guild: discord.Guild, d: dict, ev: dict, kind: str) -> str | None:
+    """Info „Anmeldung ist offen“ (kind="open") oder Anmelde-Erinnerung (kind="remind") mit @-Erwähnungen."""
+    t = D.template_of(d, ev)
+    channel = guild.get_channel(t["info_channel_id"] or ev.get("channel_id") or 0)
+    if channel is None:
+        return "Info-Kanal nicht gefunden."
+    pings = " ".join(f"<@&{r}>" for r in t["ping_role_ids"]) or None
+    try:
+        await channel.send(content=pings, embed=render.info_embed(guild, d, ev, kind),
+                           allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False))
+    except discord.HTTPException as e:
+        log.warning("Info (%s) für Event #%s nicht gesendet: %s", kind, ev["id"], e)
+        return f"Info-Nachricht nicht gesendet: {e.text or e}"
+    return None
 
 
 async def deadline_reached(guild: discord.Guild, d: dict, ev: dict):
@@ -257,24 +279,6 @@ async def deadline_reached(guild: discord.Guild, d: dict, ev: dict):
         await update_message(guild, d, ev)
         if has_reserves(d, ev):
             await post_assignment(guild, d, ev, [])
-
-
-async def nudge(guild: discord.Guild, d: dict, ev: dict):
-    """Fahrer ohne Rückmeldung vor der Frist anpingen."""
-    ev["nudge_done"] = True
-    storage.save()
-    channel = guild.get_channel(ev.get("channel_id") or 0)
-    if channel is None:
-        return
-    missing = sorted({m.id for c in assign.classes(d) if (role := guild.get_role(c["role_id"]))
-                      for m in role.members if str(m.id) not in ev["signups"] and not m.bot})
-    if not missing:
-        return
-    deadline = render.times(d, ev)["deadline"]
-    text = (f"⏰ **{D.field(d, ev, 'title')}:** Noch keine Rückmeldung von " + " ".join(f"<@{u}>" for u in missing)
-            + f"\nBitte bis <t:{tu.ts(deadline)}:f> an- oder abmelden.")
-    await channel.send(text[:2000], allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-                       reference=reply_to(ev))
 
 
 async def close(guild: discord.Guild, d: dict, ev: dict):

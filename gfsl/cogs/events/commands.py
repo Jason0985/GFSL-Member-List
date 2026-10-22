@@ -117,10 +117,14 @@ class EventsCog(commands.Cog):
         elif ev["status"] == "posted":
             if now >= t["start"]:
                 await actions.close(guild, d, ev)
-            elif not ev["deadline_done"] and now >= t["deadline"]:
+                return
+            if t["remind"] and not ev.get("remind_done") and now >= t["remind"]:
+                ev["remind_done"] = True
+                storage.save()
+                if now < t["deadline"]:  # nach der Frist wäre die Erinnerung sinnlos
+                    await actions.send_info(guild, d, ev, "remind")
+            if not ev["deadline_done"] and now >= t["deadline"]:
                 await actions.deadline_reached(guild, d, ev)
-            elif template["nudge_hours"] and not ev["nudge_done"] and now >= t["deadline"] - timedelta(hours=template["nudge_hours"]):
-                await actions.nudge(guild, d, ev)
 
     # ---------- /anmeldung: Klassen ----------
 
