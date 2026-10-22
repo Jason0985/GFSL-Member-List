@@ -36,7 +36,7 @@ async def get_user(client: discord.Client, guild: discord.Guild, user_id: int) -
 
 
 async def build_summary(client: discord.Client, guild: discord.Guild, d: dict, app: dict, color: int, status: str,
-                        number_line: str | None) -> discord.Embed:
+                        number_line: str | None, decision: str | None = None) -> discord.Embed:
     uid = int(app["user_id"])
     user = await get_user(client, guild, uid)
     joined = getattr(user, "joined_at", None)
@@ -57,20 +57,22 @@ async def build_summary(client: discord.Client, guild: discord.Guild, d: dict, a
         if q["type"] == "image" and app["answers"].get(str(q["id"])):
             value += " (angehängt)"
         embed.add_field(name=f"{n + 1}. {q['label']}"[:256], value=value[:1024], inline=False)
+    if decision:
+        # Ganz unten, kursiv: wer entschieden hat und wann
+        embed.add_field(name="\u200b", value=decision[:1024], inline=False)
     return embed
 
 
 class DecisionButton(discord.ui.DynamicItem[discord.ui.Button], template=r"gv:(?P<action>acc|rej):(?P<app>\d+)"):
     """Akzeptieren/Ablehnen. Die Antrags-ID steckt im Button, daher funktioniert er auch nach einem Neustart."""
 
-    def __init__(self, action: str, app_id: str, disabled: bool = False):
+    def __init__(self, action: str, app_id: str):
         accept = action == "acc"
         super().__init__(discord.ui.Button(
             label="Akzeptieren" if accept else "Ablehnen",
             style=discord.ButtonStyle.success if accept else discord.ButtonStyle.danger,
             emoji="✅" if accept else "❌",
             custom_id=f"gv:{action}:{app_id}",
-            disabled=disabled,
         ))
         self.action = action
         self.app_id = app_id
@@ -92,10 +94,10 @@ class DecisionButton(discord.ui.DynamicItem[discord.ui.Button], template=r"gv:(?
             await interaction.response.send_modal(RejectModal(app["id"]))
 
 
-def decision_view(app_id: str, disabled: bool = False) -> discord.ui.View:
+def decision_view(app_id: str) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
-    view.add_item(DecisionButton("acc", app_id, disabled))
-    view.add_item(DecisionButton("rej", app_id, disabled))
+    view.add_item(DecisionButton("acc", app_id))
+    view.add_item(DecisionButton("rej", app_id))
     return view
 
 
@@ -119,7 +121,8 @@ async def update_mod_message(guild: discord.Guild, app: dict, embed: discord.Emb
     if channel is None:
         return
     try:
-        await channel.get_partial_message(app["mod_message_id"]).edit(embed=embed, view=decision_view(app["id"], disabled=True))
+        # view=None: Akzeptieren/Ablehnen verschwinden, sobald entschieden ist
+        await channel.get_partial_message(app["mod_message_id"]).edit(embed=embed, view=None)
     except discord.HTTPException as e:
         log.warning("Mod-Nachricht nicht aktualisiert: %s", e)
 
@@ -186,7 +189,8 @@ async def accept(interaction: discord.Interaction, d: dict, app: dict):
         warnings += list(dict.fromkeys(report.errors))
 
     number_line = f"**Fahrernummer:** #{number}" if number is not None else None
-    embed = await build_summary(interaction.client, interaction.guild, d, app, Colors.ok, f"✅ Verifiziert von {interaction.user.mention}", number_line)
+    decision = f"*✅ Verifiziert von {interaction.user.mention} · <t:{int(time.time())}:f>*"
+    embed = await build_summary(interaction.client, interaction.guild, d, app, Colors.ok, "✅ Verifiziert", number_line, decision)
     await update_mod_message(interaction.guild, app, embed)
 
     text = f"🎉 **Du wurdest auf {interaction.guild.name} verifiziert!** Willkommen in der GFSL."
@@ -231,8 +235,10 @@ class RejectModal(discord.ui.Modal, title="Verifizierung ablehnen"):
         app["reason"] = reason
         storage.save()
 
-        status = f"❌ Abgelehnt von {interaction.user.mention}" + (f": {reason}" if reason else "")
-        embed = await build_summary(interaction.client, interaction.guild, d, app, Colors.bad, status, None)
+        decision = f"*❌ Abgelehnt von {interaction.user.mention} · <t:{int(time.time())}:f>*"
+        if reason:
+            decision += f"\n*Grund: {discord.utils.escape_markdown(reason)}*"
+        embed = await build_summary(interaction.client, interaction.guild, d, app, Colors.bad, "❌ Abgelehnt", None, decision)
         await update_mod_message(interaction.guild, app, embed)
 
         text = f"❌ Deine Verifizierung auf {interaction.guild.name} wurde abgelehnt."
