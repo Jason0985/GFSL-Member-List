@@ -248,6 +248,7 @@ Rollen und Nicknames werden beim Import **nicht** verändert. Die Plattform-Roll
 5. **Einteilung:** Zur Frist werden die angemeldeten Ersatzfahrer auf die freien Cockpits verteilt (freie Plätze = Plätze minus angemeldete Stammfahrer).
    - **Wer zuerst angemeldet ist, bekommt zuerst einen Platz.** In welches Team er kommt, ist zufällig.
    - Wer keinen Platz bekommt, steht unten unter **„Keine Einteilung – alle Plätze belegt“** (in Anmelde-Reihenfolge) und rückt automatisch nach, wenn ein Platz frei wird.
+   - **Stammfahrer, die sich zu spät anmelden**, bekommen die Q-Sperre **und verlieren ihren festen Platz**: Sie reihen sich wie Ersatzfahrer hinten ein und verdrängen keinen schon eingeteilten Fahrer. Ist noch etwas frei, fahren sie (bevorzugt im eigenen Team), sonst stehen sie unter „Keine Einteilung“.
    - Darunter erscheint eine Extra-Nachricht mit der Einteilung, „Keine Einteilung“ und den Q-Sperren.
    - Meldet sich danach noch jemand an oder ab, wird automatisch nachgetragen, und die Betroffenen werden angepingt.
    - Stammfahrer auf „vielleicht“ zählen als nicht da, ihr Cockpit wird also vergeben.

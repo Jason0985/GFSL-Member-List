@@ -157,15 +157,17 @@ async def signup(interaction: discord.Interaction, ev_id: str, status: str):
 
     deadline = render.times(d, ev)["deadline"]
     msg = STATUS_TEXT[status] + (f" als {cls['emoji']} **{cls['name']}**." if status == "yes" else ".")
+    lost_seat = ("\nAls Stammfahrer hast du damit auch deinen **festen Platz verloren**: Du fährst nur, wenn noch ein "
+                 "Platz frei ist, sonst stehst du hinten unter „Keine Einteilung“.") if cls["kind"] == "team" else ""
     if late:
         msg += (f"\n⚠️ Die Anmeldefrist ist abgelaufen (<t:{tu.ts(deadline)}:f>). "
-                "Du bist angemeldet, hast aber eine **Q-Sperre**.")
+                "Du bist angemeldet, hast aber eine **Q-Sperre**." + lost_seat)
     await interaction.response.send_message(msg, ephemeral=True)
     if late:
         try:
             await interaction.user.send(embed=discord.Embed(color=0xEF4444, description=(
                 f"⏰ Du hast dich für **{D.field(d, ev, 'title')}** nach der Anmeldefrist angemeldet.\n"
-                "Damit hast du für dieses Rennen eine **Q-Sperre**.")))
+                "Damit hast du für dieses Rennen eine **Q-Sperre**." + lost_seat)))
         except discord.HTTPException:
             pass
     await refresh(interaction.guild, d, ev)

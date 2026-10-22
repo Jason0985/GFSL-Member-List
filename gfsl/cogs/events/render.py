@@ -95,10 +95,18 @@ def event_embed(guild: discord.Guild | None, d: dict, ev: dict, hover: bool = Tr
 
     # Stammfahrer: 2 Teams pro Reihe, Abstand zwischen den Reihen
     for n, team in enumerate(teams):
-        lines = [entry(guild, uid, s, team["emoji"], hover) for uid, s in yes if s["class_id"] == team["id"]]
-        subs = [(uid, s) for uid, s in yes if ev["assignments"].get(uid, {}).get("class_id") == team["id"]]
-        lines += [f"🔁 {number(s, hover)} **{name_of(guild, uid, s)}**" for uid, s in subs]
-        embed.add_field(name=f"{team['emoji']} {team['name']} ({len(lines)}/{team['seats']})"[:256], value=clip(lines), inline=True)
+        # Feste Plätze: rechtzeitig angemeldete Stammfahrer
+        lines = [entry(guild, uid, s, team["emoji"], hover) for uid, s in yes if s["class_id"] == team["id"] and not s.get("late")]
+        # Eingeteilt: späte Stammfahrer im eigenen Team (Team-Icon) oder Ersatz/Fremde (🔁)
+        for uid, s in yes:
+            if ev["assignments"].get(uid, {}).get("class_id") == team["id"]:
+                icon = team["emoji"] if s["class_id"] == team["id"] else "🔁"
+                lines.append(entry(guild, uid, s, icon, hover))
+        driving = len(lines)
+        # Zu spät angemeldet und kein Platz: steht beim Team, zählt aber nicht
+        lines += [entry(guild, uid, s, "🚫", hover) for uid, s in yes
+                  if s["class_id"] == team["id"] and s.get("late") and uid not in ev["assignments"]]
+        embed.add_field(name=f"{team['emoji']} {team['name']} ({driving}/{team['seats']})"[:256], value=clip(lines), inline=True)
         if n % 2 == 1 or n == len(teams) - 1:
             spacer(embed)
 
@@ -167,10 +175,14 @@ def assignment_embed(guild: discord.Guild | None, d: dict, ev: dict) -> discord.
         if subs:
             lines.append(f"{team['emoji']} **{team['name']}:** " + ", ".join(f"<@{u}>" for u in subs))
     if not lines:
-        lines.append("Keine freien Cockpits – alle Stammfahrer sind angemeldet.")
+        lines.append("Keine freien Cockpits – alle Stammfahrer sind rechtzeitig angemeldet.")
     if wait := assign.waiting(d, ev):
         lines += ["", f"🚫 **Keine Einteilung – alle Plätze belegt ({len(wait)}):**"]
-        lines += [f"`{ev['signups'][u]['order']}` <@{u}>" for u in wait]
+        kinds = {k["id"]: k for k in assign.classes(d)}
+        for u in wait:
+            cls = kinds.get(ev["signups"][u]["class_id"])
+            note = f" – {cls['emoji']} Stammfahrer, zu spät angemeldet" if cls and cls["kind"] == "team" else ""
+            lines.append(f"`{ev['signups'][u]['order']}` <@{u}>{note}")
         lines.append("-# Wird ein Platz frei, rückt der Nächste in Anmelde-Reihenfolge automatisch nach.")
     late = [uid for uid, s in sorted(ev["signups"].items(), key=lambda e: e[1]["order"]) if s["status"] == "yes" and s.get("late")]
     if late:
