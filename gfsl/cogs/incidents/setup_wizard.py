@@ -7,6 +7,10 @@ from . import data as D
 from .ticket import PanelView, panel_embed
 
 TEXT = [discord.ChannelType.text, discord.ChannelType.news]
+FORUM = [discord.ChannelType.forum, discord.ChannelType.media]
+TYPE_NAMES = {discord.ChannelType.text: "Textkanal", discord.ChannelType.news: "Ankündigungskanal",
+              discord.ChannelType.forum: "Forum", discord.ChannelType.media: "Medienkanal", discord.ChannelType.category: "Kategorie",
+              discord.ChannelType.voice: "Sprachkanal", discord.ChannelType.stage_voice: "Bühnenkanal"}
 
 STEPS = [
     ("panel_channel", "Melde-Kanal"),
@@ -23,7 +27,7 @@ PERMS = {
     "panel_channel_id": PERMS_SEND,
     "category_id": [("view_channel", "Kanal ansehen"), ("manage_channels", "Kanäle verwalten"),
                     ("manage_roles", "Berechtigungen verwalten"), ("send_messages", "Nachrichten senden")],
-    "result_channel_id": PERMS_SEND + [("attach_files", "Dateien anhängen")],
+    "result_channel_id": PERMS_SEND + [("attach_files", "Dateien anhängen"), ("send_messages_in_threads", "Nachrichten in Threads senden")],
     "archive_channel_id": PERMS_SEND + [("attach_files", "Dateien anhängen"), ("create_public_threads", "Öffentliche Threads erstellen"),
                                         ("send_messages_in_threads", "Nachrichten in Threads senden"), ("manage_threads", "Threads verwalten")],
 }
@@ -110,6 +114,10 @@ class IncidentSetup(discord.ui.View):
                 await self.refresh(i, "✅ Gespeichert.")
             self.button(f"Diesen Kanal nehmen: #{self.channel.name}"[:80], discord.ButtonStyle.secondary, here, emoji="📍", row=1)
 
+        async def by_id(i):
+            await i.response.send_modal(ChannelIdModal(self, key, types))
+        self.button("Per ID setzen", discord.ButtonStyle.secondary, by_id, emoji="🔢", row=1)
+
     def render(self) -> discord.Embed:
         self.clear_items()
         key, name = STEPS[self.step]
@@ -157,15 +165,16 @@ class IncidentSetup(discord.ui.View):
             self.add_item(select)
         elif key == "result":
             embed.description = ("Wo wird die **FIA-Entscheidung** veröffentlicht? Einsender und Beschuldigte werden dort "
-                                 "erwähnt, Videos und Links hängen dran.\n\n"
+                                 "erwähnt, Videos und Links hängen dran.\n"
+                                 "Geht als Text- oder **Forum-Kanal** – im Forum wird jede Entscheidung ein eigener Beitrag.\n\n"
                                  f"**Aktuell:** {channel_status(self.guild, s, 'result_channel_id')}")
-            self.channel_select("result_channel_id", "Ergebnis-Kanal wählen …", TEXT)
+            self.channel_select("result_channel_id", "Ergebnis-Kanal wählen (Text oder Forum) …", [*TEXT, *FORUM])
         elif key == "archive":
             embed.description = ("Wo werden abgeschlossene Fälle **archiviert**? Jeder Vorfall wird ein eigener Thread mit dem "
                                  "kompletten Verlauf (Uhrzeiten, Texte, Dateien) und einem Protokoll als Datei.\n"
                                  "Tipp: Ein **Forum-Kanal** ist dafür ideal (jeder Vorfall ein Beitrag). Nur für Ligaleitung/Stewards sichtbar machen.\n\n"
                                  f"**Aktuell:** {channel_status(self.guild, s, 'archive_channel_id')}")
-            self.channel_select("archive_channel_id", "Archiv-Kanal wählen (Forum oder Text) …", [*TEXT, discord.ChannelType.forum])
+            self.channel_select("archive_channel_id", "Archiv-Kanal wählen (Forum oder Text) …", [*TEXT, *FORUM])
         else:
             missing = [label for k, label in (("panel_channel_id", "Melde-Kanal"), ("category_id", "Kategorie"),
                                               ("result_channel_id", "Ergebnis-Kanal"), ("archive_channel_id", "Archiv")) if not s[k]]
@@ -198,6 +207,31 @@ class IncidentSetup(discord.ui.View):
         if self.step < len(STEPS) - 1:
             self.button("Weiter", discord.ButtonStyle.primary, forward, emoji="▶️", row=4)
         return embed
+
+
+class ChannelIdModal(discord.ui.Modal, title="Kanal per ID setzen"):
+    """Falls ein Kanal im Menü nicht auftaucht: Rechtsklick auf den Kanal → „Kanal-ID kopieren“ (Entwicklermodus)."""
+
+    def __init__(self, wizard: IncidentSetup, key: str, types: list[discord.ChannelType]):
+        super().__init__()
+        self.wizard, self.key, self.types = wizard, key, types
+        self.channel_id = discord.ui.TextInput(label="Kanal-ID oder #Kanal-Link", max_length=100,
+                                               placeholder="z. B. 123456789012345678")
+
+        self.add_item(self.channel_id)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        digits = "".join(c if c.isdigit() else " " for c in self.channel_id.value).split()
+        channel = self.wizard.guild.get_channel(int(digits[-1])) if digits else None
+        if channel is None:
+            return await self.wizard.refresh(interaction, "❌ Kanal nicht gefunden. Sieht der Bot ihn (Kanal ansehen)?")
+        if channel.type not in self.types:
+            allowed = ", ".join(dict.fromkeys(TYPE_NAMES.get(t, str(t)) for t in self.types))
+            return await self.wizard.refresh(interaction, f"❌ {channel.mention} ist ein {TYPE_NAMES.get(channel.type, channel.type)} – "
+                                                          f"hier geht nur: {allowed}.")
+        self.wizard.s[self.key] = channel.id
+        storage.save()
+        await self.wizard.refresh(interaction, f"✅ {channel.mention} gespeichert.")
 
 
 class PanelModal(discord.ui.Modal, title="Melde-Panel bearbeiten"):

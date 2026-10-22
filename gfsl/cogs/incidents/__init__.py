@@ -1,4 +1,4 @@
-"""Rennvorfall-Modul: Vorfall melden per Button, privates Ticket, Stellungnahmen, FIA-Entscheidung, Archiv-Thread."""
+"""Rennvorfall-Modul: Vorfall melden per Button, privates Ticket, Aussagen, FIA-Entscheidung, Archiv-Thread."""
 from discord.ext import commands
 
 from .commands import IncidentsCog

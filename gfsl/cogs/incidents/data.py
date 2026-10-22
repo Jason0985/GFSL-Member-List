@@ -28,7 +28,7 @@ DEFAULTS = {
 
 PHASES = {
     "reporter": "✍️ Einsender schreibt",
-    "statements": "🗣️ Stellungnahmen",
+    "statements": "🗣️ Aussagen",
     "review": "⚖️ Bewertung durch die Stewards",
     "closed": "✅ Abgeschlossen",
     "cancelled": "✖️ Abgebrochen",
@@ -45,9 +45,9 @@ def new_ticket(d: dict, reporter_id: int, now: int) -> dict:
     t = {
         "id": tid, "channel_id": None, "status_message_id": None, "phase": "reporter",
         "reporter_id": str(reporter_id), "accused": [], "extra": [],
-        "entries": {},         # user_id -> {message_id, at, fields, links}: Meldung bzw. Stellungnahme aus dem Formular
+        "entries": {},         # user_id -> {message_id, at, fields, links}: Meldung bzw. Aussage aus dem Formular
         "submitted": {},       # user_id -> Zeitpunkt, an dem er abgeschickt hat
-        "skipped": [],         # ohne Stellungnahme weiter (Button der Stewards)
+        "skipped": [],         # ohne Aussage weiter (Button der Stewards)
         "opened_at": now, "closed_at": None, "closed_by": None,
         "decision": None, "penalty": None, "log": [],
     }

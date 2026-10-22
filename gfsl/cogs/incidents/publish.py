@@ -1,4 +1,4 @@
-"""Fall abschließen: Entscheidung veröffentlichen (mit Links + Dateien), Verlauf ins Archiv kopieren, Ticket löschen."""
+"""Entscheidung eintragen: Entscheidung veröffentlichen (mit Links + Dateien), Verlauf ins Archiv kopieren, Ticket löschen."""
 import asyncio
 import io
 import logging
@@ -60,7 +60,7 @@ def summary_embed(t: dict, guild: discord.Guild, links: list[tuple[str, str]], t
     embed.add_field(name="Gemeldet", value=f"<t:{t['opened_at']}:f>", inline=True)
     embed.add_field(name="Entschieden", value=f"<t:{t['closed_at']}:f>", inline=True)
     if links:
-        lines = [f"• [{'YouTube' if 'youtu' in url else 'Link'}]({url}) von <@{uid}>" for uid, url in dict.fromkeys(links)]
+        lines = [f"• [Video]({url}) von <@{uid}>" for uid, url in dict.fromkeys(links)]
         embed.add_field(name="🎥 Videos & Links", value="\n".join(lines)[:1024], inline=False)
     if too_big:
         embed.add_field(name="⚠️ Zu groß zum Anhängen", inline=False,
@@ -69,9 +69,9 @@ def summary_embed(t: dict, guild: discord.Guild, links: list[tuple[str, str]], t
 
 
 async def send_with_files(target, files: list[discord.File], **kwargs) -> discord.Message:
-    """Erste Nachricht mit bis zu 10 Dateien, weitere Dateien in Folge-Nachrichten."""
-    first = await target.send(files=files[:10], **kwargs)
-    for i in range(10, len(files), 10):
+    """Erst die Entscheidung, danach die Anhänge (je bis zu 10 pro Nachricht) – so bleibt die Entscheidung oben."""
+    first = await target.send(**kwargs)
+    for i in range(0, len(files), 10):
         await target.send(files=files[i:i + 10])
     return first
 
@@ -103,7 +103,7 @@ async def copy_to_archive(target, messages: list[discord.Message], bot_id: int, 
             buffer = ""
 
     for m in messages:
-        if m.id in entry_ids:  # Formular-Eintrag (Meldung/Stellungnahme) mit Dateien übernehmen
+        if m.id in entry_ids:  # Formular-Eintrag (Meldung/Aussage) mit Dateien übernehmen
             await flush()
             files, too_big = await download(m.attachments, limit)
             missing += [a.filename for a in too_big]
@@ -126,14 +126,18 @@ async def copy_to_archive(target, messages: list[discord.Message], bot_id: int, 
     return missing
 
 
+def thread_name(guild: discord.Guild, t: dict) -> str:
+    accused = ", ".join((m.display_name if (m := guild.get_member(int(u))) else u) for u in t["accused"])
+    reporter = guild.get_member(int(t["reporter_id"]))
+    return f"Rennvorfall {D.number(t)} · {reporter.display_name if reporter else t['reporter_id']} vs {accused}"[:100]
+
+
 async def archive(guild: discord.Guild, t: dict, s: dict, messages, summary: discord.Embed) -> tuple[str | None, bool]:
     """Legt den Archiv-Thread an. Gibt (Link, alle Dateien archiviert?) zurück."""
     channel = guild.get_channel(s["archive_channel_id"] or 0)
     if channel is None:
         return None, False
-    accused = ", ".join((m.display_name if (m := guild.get_member(int(u))) else u) for u in t["accused"])
-    reporter = guild.get_member(int(t["reporter_id"]))
-    name = f"{D.number(t)} · {reporter.display_name if reporter else t['reporter_id']} vs {accused}"[:100]
+    name = thread_name(guild, t)
     file = transcript(messages, t)
     if isinstance(channel, discord.ForumChannel):
         thread = (await channel.create_thread(name=name, embed=summary, file=file,
@@ -171,14 +175,24 @@ async def close_ticket(interaction: discord.Interaction, tid: str, decision: str
         result_url = None
         if results:
             pings = " ".join(f"<@{u}>" for u in [t["reporter_id"], *t["accused"]])
-            msg = await send_with_files(results, files, content=pings, embed=summary,
-                                        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False))
-            result_url = msg.jump_url
+            kwargs = {"content": pings, "embed": summary,
+                      "allowed_mentions": discord.AllowedMentions(users=True, roles=False, everyone=False)}
+            try:
+                if isinstance(results, discord.ForumChannel):
+                    # Forum: jede Entscheidung ein eigener Beitrag, Anhänge darunter im Beitrag
+                    post = await results.create_thread(name=thread_name(guild, t), **kwargs)
+                    for i in range(0, len(files), 10):
+                        await post.thread.send(files=files[i:i + 10])
+                    result_url = post.thread.jump_url
+                else:
+                    result_url = (await send_with_files(results, files, **kwargs)).jump_url
+            except discord.HTTPException as e:
+                log.warning("Entscheidung #%s nicht veröffentlicht: %s", t["id"], e)
 
         archive_url, complete = await archive(guild, t, s, messages, summary_embed(t, guild, links, too_big))
         storage.save()
 
-    notes = [f"✅ Entscheidung veröffentlicht: {result_url}" if result_url else "⚠️ Ergebnis-Kanal nicht gefunden – nichts veröffentlicht."]
+    notes = [f"✅ Entscheidung veröffentlicht: {result_url}" if result_url else "⚠️ Entscheidung nicht veröffentlicht – Ergebnis-Kanal fehlt oder mir fehlen dort Rechte (siehe `/rennvorfall einstellungen`)."]
     notes.append(f"🗄️ Archiv: {archive_url}" if archive_url else "⚠️ Archiv-Kanal nicht gefunden – nichts archiviert.")
     if archive_url and complete and result_url:
         notes.append("Der Ticket-Kanal wird in 15 Sekunden gelöscht.")

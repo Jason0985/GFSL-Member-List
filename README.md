@@ -290,33 +290,35 @@ Gezählt werden alle vergangenen Rennen und alle Mitglieder, die gerade eine Anm
 2. **Text & Button:** Titel, Text und Beschriftung des Buttons. Der Button öffnet nur das Ticket, das Formular kommt danach im Ticket.
 3. **Ticket-Kategorie:** Hier entstehen die privaten Kanäle `vorfall-0001`, `vorfall-0002`, …
 4. **Ligaleitung & Stewards:** Diese Rollen sehen alle Tickets und werden angepingt, wenn ein Fall bereit zur Bewertung ist.
-5. **Ergebnis-Kanal:** Hier wird die FIA-Entscheidung veröffentlicht.
+5. **Ergebnis-Kanal:** Hier wird die FIA-Entscheidung veröffentlicht. Das kann ein Text- oder **Forum-Kanal** sein. Im Forum wird jede Entscheidung ein eigener Beitrag („Rennvorfall #0001 · A vs B“), die Anhänge stehen darunter.
 6. **Archiv:** Text- oder **Forum-Kanal** (empfohlen), nur für Ligaleitung/Stewards sichtbar. Jeder Vorfall bekommt einen eigenen Thread.
 7. **Panel posten.**
+
+Taucht ein Kanal im Menü nicht auf, gibt es in jedem Kanal-Schritt **„🔢 Per ID setzen“**. Dafür in Discord unter *Einstellungen → Erweitert* den **Entwicklermodus** einschalten, dann Rechtsklick auf den Kanal → **„Kanal-ID kopieren“**. Ein Kanal-Link geht auch.
 
 Außerdem: `/rennvorfall einstellungen`, `/rennvorfall panel`, `/rennvorfall offen` (alle offenen Fälle mit Stand).
 
 ### Ablauf
 
 1. **Vorfall melden** → privater Kanal für den Einsender, die Ligaleitung und die Stewards, mit Status und Buttons.
-2. **Einsender** öffnet mit **📝 Formular öffnen** das Meldeformular. Das geht **jederzeit, auch später**, und er kann es beliebig oft ändern. Es enthält:
+2. **Einsender** öffnet mit **📝 Aussage eintragen** das Meldeformular. Das geht **jederzeit, auch später**. Danach heißt der Button **📝 Aussage anpassen**, und er kann es beliebig oft ändern. Es enthält:
    - **Beschuldigte** (Auswahl, mehrere möglich)
    - **Vorfall**
    - **Vorfallbeschreibung**
    - **Video-Links**
    - **Video/Screenshots** (Upload)
 
-   Der Bot zeigt die Meldung im Ticket an. Zusätzlich darf der Einsender im Kanal schreiben oder Dateien posten. Passt alles, klickt er **Einsendung abschicken**. → Der Einsender wird entfernt, die Beschuldigten werden dazugeholt und angepingt.
-3. **Beschuldigte** füllen über **📝 Formular öffnen** ihre Stellungnahme aus (Text, Video-Links, Upload) und klicken **Stellungnahme abschicken**. → Jeder wird danach entfernt.
+   Der Bot zeigt die Meldung im Ticket an. Zusätzlich darf der Einsender im Kanal schreiben oder Dateien posten. Passt alles, klickt er den roten Button **Einsendung endgültig abschicken**. → Der Einsender wird entfernt, die Beschuldigten werden dazugeholt und angepingt.
+3. **Beschuldigte** füllen über **📝 Aussage eintragen** ihre Aussage aus (Text, Video-Links, Upload) und klicken den roten Button **Aussage endgültig abschicken**. → Jeder wird danach entfernt.
    - **Person hinzufügen** (Stewards): weitere Beteiligte oder andere Sichten dazuholen. Für sie gilt derselbe Ablauf.
    - **Ohne Gegenclip bewerten** (Stewards): Kommt nichts mehr, werden alle Ausstehenden entfernt und es geht weiter.
 4. **Beratung:** Sind alle Teile da, werden die Stewards angepingt und können im Kanal diskutieren.
-5. **Fall abschließen** (Stewards): Entscheidung und Strafe(n) als Freitext eintragen. Danach:
-   - Im Ergebnis-Kanal erscheint die **FIA-Entscheidung**. Einsender und Beschuldigte werden erwähnt, YouTube-Links und Dateien hängen dran.
+5. **⚖️ Entscheidung eintragen** (Stewards): Entscheidung und Strafe(n) als Freitext eintragen. Danach:
+   - Im Ergebnis-Kanal erscheint die **FIA-Entscheidung**. Einsender und Beschuldigte werden erwähnt, die Videos/Links (als „Video von …“) stehen in der Entscheidung, Dateien folgen darunter.
    - Im Archiv entsteht ein **Thread** mit dem kompletten Verlauf (Uhrzeiten, Texte, Dateien) und einem Protokoll als `.txt`.
    - Der Ticket-Kanal wird gelöscht.
 
-**Uhrzeiten:** Jeder Schritt wird im Ticket, im Status und im Archiv mit Uhrzeit festgehalten (eröffnet, abgeschickt, Stellungnahmen, hinzugefügt, abgeschlossen).
+**Uhrzeiten:** Jeder Schritt wird im Ticket, im Status und im Archiv mit Uhrzeit festgehalten (eröffnet, abgeschickt, Aussagen, hinzugefügt, abgeschlossen).
 
 **Befangenheit:** Wer Einsender, Beschuldigter oder hinzugefügt ist, wird nach seinem Teil aus dem Ticket ausgesperrt. Das gilt auch, wenn er selbst Ligaleitung oder Steward ist.
 
