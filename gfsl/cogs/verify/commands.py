@@ -65,8 +65,7 @@ async def number_autocomplete(interaction: discord.Interaction, current: str) ->
         if owner:
             name = d["drivers"][owner].get("name") or owner
             return [app_commands.Choice(name=f"#{n} – belegt von {name}"[:100], value=n)]
-        reserved = " – reserviert" if n in d["settings"]["reserved_numbers"] else " – frei"
-        return [app_commands.Choice(name=f"#{n}{reserved}", value=n)]
+        return [app_commands.Choice(name=f"#{n} – frei", value=n)]
     return [app_commands.Choice(name=f"#{n} – frei", value=n) for n in drivers.free_numbers(d, uid)[:25]]
 
 
@@ -306,8 +305,6 @@ class VerifyCog(commands.Cog):
         await option_roles.sync_member(user, d, option_roles.mapped_questions(d["questions"]), report,
                                        remove_others=bool(plattform or flagge))
         warnings += list(dict.fromkeys(report.errors))
-        if nummer in d["settings"]["reserved_numbers"]:
-            warnings.append(f"#{nummer} steht auf der Reserviert-Liste.")
         await interaction.followup.send(f"✅ {user.mention} ist jetzt **#{nummer}**." + "".join(f"\n⚠️ {w}" for w in warnings), ephemeral=True)
 
     @fahrer.command(name="entfernen", description="Fahrer austragen (Nummer wird frei)")
@@ -334,24 +331,23 @@ class VerifyCog(commands.Cog):
         report = await option_roles.sync_all(interaction.guild, d, questions, andere_entfernen)
         await interaction.followup.send(report.text()[:2000], ephemeral=True)
 
-    @fahrer.command(name="nummern", description="Übersicht aller Nummern: frei, vergeben, reserviert")
+    @fahrer.command(name="nummern", description="Übersicht aller Nummern: frei und vergeben")
     @app_commands.describe(oeffentlich="Für alle sichtbar in den Kanal posten")
     async def nummern(self, interaction: discord.Interaction, oeffentlich: bool = False):
         d = data.get(interaction.guild_id)
         s = d["settings"]
         taken = {drv["number"] for drv in d["drivers"].values() if isinstance(drv.get("number"), int)}
-        reserved = set(s["reserved_numbers"])
         width = len(str(s["number_max"]))
         cells = []
         for n in range(s["number_min"], s["number_max"] + 1):
-            cells.append("·" * width if n in taken else ("x" * width if n in reserved else str(n).rjust(width)))
+            cells.append("·" * width if n in taken else str(n).rjust(width))
         rows = [" ".join(cells[i:i + 10]) for i in range(0, len(cells), 10)]
         grid = "\n".join(rows)
         if len(grid) > 3800:
             grid = grid[:3800] + "\n…"
         free = len(drivers.free_numbers(d))
         embed = discord.Embed(color=Colors.list, title="🔢 Fahrernummern",
-                              description=f"```\n{grid}\n```\n`{'·' * width}` vergeben · `{'x' * width}` reserviert · "
+                              description=f"```\n{grid}\n```\n`{'·' * width}` vergeben · "
                                           f"**{free} frei** von {s['number_max'] - s['number_min'] + 1}")
         await interaction.response.send_message(embed=embed, ephemeral=not oeffentlich)
 
@@ -367,7 +363,7 @@ class VerifyCog(commands.Cog):
         records, gone = imp.check(records, interaction.guild, d, only_members)
         if not records:
             return await interaction.followup.send(
-                f"{read_info}\nKeine Fahrer erkannt. Schick mir am besten ein Beispiel einer alten Nachricht, dann passe ich die Erkennung an.",
+                f"{read_info}\nKeine Fahrer erkannt. Hat ein Mensch die alte Liste gepostet, probier `nur_bots:False`. Sonst schick mir am besten ein Beispiel einer alten Nachricht, dann passe ich die Erkennung an.",
                 ephemeral=True)
         embed = imp.preview_embed(records, interaction.guild, d, read_info, gone, only_members)
         await interaction.followup.send(embed=embed, file=imp.to_csv(records, interaction.guild),
@@ -376,7 +372,7 @@ class VerifyCog(commands.Cog):
     @fahrer.command(name="import_kanal", description="Altdaten aus einem Kanal einlesen, z. B. die Nachrichten des alten Melpo-Bots")
     @app_commands.describe(kanal="Kanal mit den alten Verify-Nachrichten oder der alten Fahrerliste",
                            nur_mitglieder="Nur User übernehmen, die noch auf dem Server sind (Standard: ja)",
-                           nur_bots="Nur Nachrichten von Bots lesen (Standard: ja)",
+                           nur_bots="Nur Bot-Nachrichten lesen (Standard: ja). Bei einer von Hand gepflegten Liste: False",
                            anzahl="Wie viele Nachrichten maximal gelesen werden (Standard: 5000)")
     async def import_kanal(self, interaction: discord.Interaction, kanal: discord.TextChannel, nur_mitglieder: bool = True,
                            nur_bots: bool = True, anzahl: app_commands.Range[int, 1, 20000] = 5000):

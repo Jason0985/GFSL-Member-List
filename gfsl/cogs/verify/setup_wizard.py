@@ -49,7 +49,6 @@ def role_status(guild: discord.Guild, role_id: int | None, assigned: bool = True
 def settings_overview(guild: discord.Guild, d: dict) -> str:
     s = d["settings"]
     example = drivers.render_nickname(s["nickname_template"], {"name": "Wenig-Luca", "number": 17, "flag": "Deutschland", "platform": "PlayStation"})
-    reserved = ", ".join(map(str, s["reserved_numbers"])) or "—"
     return "\n".join([
         f"**Start-Kanal:** {channel_status(guild, s['panel_channel_id'], PERMS_SEND)}",
         f"**Mod-Kanal:** {channel_status(guild, s['mod_channel_id'], PERMS_MOD)}",
@@ -58,7 +57,7 @@ def settings_overview(guild: discord.Guild, d: dict) -> str:
         f"**Rolle entfernen:** {role_status(guild, s['remove_role_id'])}",
         f"**Mod-Rolle:** {role_status(guild, s['mod_role_id'], assigned=False)} (+ alle mit „Server verwalten“)",
         f"**Nickname-Vorlage:** `{s['nickname_template']}` → z. B. „{example}“",
-        f"**Nummern:** {s['number_min']}–{s['number_max']} · reserviert: {reserved}",
+        f"**Nummern:** {s['number_min']}–{s['number_max']}",
         f"**Fragen:** {len(d['questions'])}",
     ])
 
@@ -241,8 +240,7 @@ class SetupWizard(discord.ui.View):
         embed.description = (
             f"**Nickname-Vorlage:** `{s['nickname_template']}` → z. B. „{example}“\n"
             "Platzhalter: `{name}` `{nummer}` `{flagge}` `{plattform}` (max. 32 Zeichen)\n\n"
-            f"**Fahrernummern:** {s['number_min']}–{s['number_max']}\n"
-            f"**Reserviert:** {', '.join(map(str, s['reserved_numbers'])) or '—'}\n\n"
+            f"**Fahrernummern:** {s['number_min']}–{s['number_max']}\n\n"
             "Beim Verifizieren können User aus allen freien Nummern im Bereich wählen."
         )
 
@@ -339,20 +337,17 @@ class NumbersModal(discord.ui.Modal, title="Nickname & Nummern"):
                                          placeholder="{name} oder #{nummer} | {name}")
         self.lo = discord.ui.TextInput(label="Kleinste Fahrernummer", default=str(s["number_min"]), max_length=3)
         self.hi = discord.ui.TextInput(label="Größte Fahrernummer", default=str(s["number_max"]), max_length=3)
-        self.reserved = discord.ui.TextInput(label="Reservierte Nummern (mit Komma)", required=False, max_length=400,
-                                             default=", ".join(map(str, s["reserved_numbers"])), placeholder="z. B. 1, 33")
-        for item in (self.nick, self.lo, self.hi, self.reserved):
+        for item in (self.nick, self.lo, self.hi):
             self.add_item(item)
 
     async def on_submit(self, interaction: discord.Interaction):
         s = self.wizard.s
         try:
             lo, hi = int(self.lo.value), int(self.hi.value)
-            reserved = sorted({int(x) for x in self.reserved.value.replace(";", ",").replace(" ", ",").split(",") if x.strip()})
         except ValueError:
             return await self.wizard.refresh(interaction, "❌ Nummern bitte nur als ganze Zahlen eingeben.")
         if not 0 <= lo <= hi <= 999:
             return await self.wizard.refresh(interaction, "❌ Der Bereich muss zwischen 0 und 999 liegen (klein ≤ groß).")
-        s.update(nickname_template=self.nick.value.strip() or "{name}", number_min=lo, number_max=hi, reserved_numbers=reserved)
+        s.update(nickname_template=self.nick.value.strip() or "{name}", number_min=lo, number_max=hi)
         self.wizard.save()
         await self.wizard.refresh(interaction, "✅ Gespeichert.")

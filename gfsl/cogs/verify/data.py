@@ -24,7 +24,6 @@ DEFAULTS = {
         "nickname_template": "{name}",
         "number_min": 1,
         "number_max": 99,
-        "reserved_numbers": [],
     },
     "questions": [],
     "next_question_id": 1,

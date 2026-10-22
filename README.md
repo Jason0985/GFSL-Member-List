@@ -60,9 +60,13 @@ Der Assistent führt in einer privaten Nachricht durch acht Schritte:
 1. **Start-Kanal:** Hier steht der Button „Verifizierung starten“.
 2. **Start-Nachricht:** Titel, Text und Button-Beschriftung festlegen, mit Vorschau.
 3. **Mod-Kanal:** Hier landen die ausgefüllten Anträge.
-4. **Fahrerliste:** Kanal für die automatische Liste (`#17 🇩🇪 Name @User`).
+4. **Fahrerliste:** Kanal für die automatische Liste. Dort stehen alle Nummern untereinander:
+   ```
+   11:                       ← frei
+   13: 🇩🇪 @User Wenig-Luca (PlayStation)
+   ```
 5. **Rollen:** Rolle bei Freigabe, Rolle, die entfernt wird (z. B. Unverifiziert), und Mod-Rolle.
-6. **Nickname & Nummern:** Vorlage wie `#{nummer} | {name}`, Nummernbereich und reservierte Nummern.
+6. **Nickname & Nummern:** Vorlage wie `#{nummer} | {name}`, und Nummernbereich.
 7. **Fragen:** Standardfragen laden und mit **Testlauf** selbst ausprobieren.
 8. **Panel posten:** Postet den Start-Button (bzw. aktualisiert ihn) und baut die Fahrerliste auf.
 
@@ -72,7 +76,7 @@ Mit `/verify setup schritt:` springst du direkt zu einem Schritt. Zu fehlenden R
 
 1. Klick auf **„Verifizierung starten“**. Es öffnet sich ein **Formular (Discord-Dialog)** mit bis zu 5 Fragen.
 2. Danach erscheint unten ein **privates Overlay** („Nur du kannst das sehen“) mit dem Fortschritt und dem Button für den nächsten Teil.
-3. Die **Fahrernummer** wählt man im Overlay aus allen freien Nummern (bei mehr als 25 erst einen Bereich, dann die Nummer). Vergebene und reservierte Nummern tauchen nicht auf.
+3. Die **Fahrernummer** wählt man im Overlay aus allen freien Nummern (bei mehr als 25 erst einen Bereich, dann die Nummer). Nur schon vergebene Nummern tauchen nicht auf.
 4. Am Ende kommt eine **Zusammenfassung**. Über „Etwas ändern …“ lässt sich jeder Teil noch einmal öffnen, danach auf **Abschicken** klicken.
 5. Der Antrag landet im **Mod-Kanal**, mit Screenshots als Anhang und einer Vorschau der Nummer („Wunsch #17 belegt → bekommt #18“, falls die Nummer inzwischen weg ist).
 6. **Akzeptieren:** Der Bot setzt den Nickname, vergibt bzw. entfernt die Rollen, trägt die Nummer ein, aktualisiert die Fahrerliste und schickt dem User eine DM.
@@ -99,7 +103,7 @@ Alle Befehle sind nur für Leute mit „Server verwalten“ sichtbar. Das kannst
 | `/fahrer setzen` | Fahrer manuell eintragen oder Nummer ändern. Beim Tippen werden freie Nummern und Flaggen vorgeschlagen. |
 | `/fahrer entfernen` | Fahrer austragen, die Nummer wird wieder frei. |
 | `/fahrer rollen_sync` | Gibt allen eingetragenen Fahrern die Rollen passend zu ihrer Auswahl, auch nachträglich. |
-| `/fahrer nummern` | Übersicht aller Nummern (frei, vergeben, reserviert), optional öffentlich. |
+| `/fahrer nummern` | Übersicht aller Nummern (frei, vergeben), optional öffentlich. |
 | `/fahrer aktualisieren` | Fahrerliste neu aufbauen. |
 | `/fahrer export` | Alle Fahrer als CSV (Excel). |
 | `/fahrer import_kanal` / `import_nicknames` / `import_csv` | Altdaten übernehmen (siehe unten). |
@@ -150,7 +154,9 @@ Der Bot liest die alten Nachrichten im Kanal vom ältesten bis zum neuesten Eint
 /fahrer import_kanal kanal:#alter-verify-kanal
 ```
 
-- Erkannt werden **Formular-Nachrichten** (Embed-Felder wie „Ingame-Name“, „Fahrernummer“, „Flagge“, „Plattform“, den User über die Erwähnung oder die User-ID) und **Listen-Zeilen** wie `#17 🇩🇪 Name @User` (z. B. eine alte Fahrerliste).
+- Erkannt werden **Formular-Nachrichten** (Embed-Felder wie „Ingame-Name“, „Fahrernummer“, „Flagge“, „Plattform“, den User über die Erwähnung oder die User-ID) und **Listen-Zeilen** wie `13: @User` oder `#17 🇩🇪 Name @User` (z. B. eine alte Fahrerliste).
+- Zeilen ohne User (z. B. `10: Pierre Gasly`, `17: //` oder leer) gelten als freie Nummern und werden ignoriert.
+- Hat ein Mensch die alte Liste gepostet (nicht der Bot), braucht es `nur_bots:False`.
 - Nachrichten mit „abgelehnt“/„denied“ werden übersprungen. Standardmäßig werden nur Nachrichten von Bots gelesen und nur User übernommen, die noch auf dem Server sind.
 - Ist eine Nummer doppelt vergeben, behält sie der zuletzt gesehene Eintrag. Der andere wird ohne Nummer eingetragen und in der CSV markiert.
 - Es kommt immer erst eine **Vorschau** mit CSV-Datei. Danach wählst du **Alle übernehmen**, **Nur neue übernehmen** oder **Abbrechen**.

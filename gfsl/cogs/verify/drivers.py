@@ -10,7 +10,7 @@ from .flags import lookup_flag
 
 
 def taken_numbers(d: dict, except_user_id: str | None = None) -> set[int]:
-    taken = set(d["settings"]["reserved_numbers"])
+    taken = set()
     for uid, drv in d["drivers"].items():
         if uid != except_user_id and isinstance(drv.get("number"), int):
             taken.add(drv["number"])
@@ -65,11 +65,35 @@ async def set_nickname(member: discord.Member, template: str, drv: dict) -> str 
     return None
 
 
+def driver_text(uid: str, drv: dict) -> str:
+    """„🇩🇪 @User Wenig-Luca (PlayStation)“"""
+    parts = [lookup_flag(drv.get("flag")), f"<@{uid}>", discord.utils.escape_markdown(drv.get("name") or "")]
+    if drv.get("platform"):
+        parts.append(f"({discord.utils.escape_markdown(drv['platform'])})")
+    return " ".join(p for p in parts if p)
+
+
 def driver_line(uid: str, drv: dict) -> str:
-    nr = f"#{drv['number']:02d}" if isinstance(drv.get("number"), int) else "#--"
-    flag = lookup_flag(drv.get("flag"))
-    name = discord.utils.escape_markdown(drv.get("name") or "?")
-    return f"`{nr}` {flag + ' ' if flag else ''}**{name}** · <@{uid}>"
+    nr = drv["number"] if isinstance(drv.get("number"), int) else "–"
+    return f"{nr}: {driver_text(uid, drv)}"
+
+
+def list_lines(d: dict) -> list[str]:
+    """Alle Nummern untereinander: frei = leer, vergeben = Fahrer."""
+    s = d["settings"]
+    by_number = {drv["number"]: uid for uid, drv in d["drivers"].items() if isinstance(drv.get("number"), int)}
+    lines = []
+    for n in range(s["number_min"], s["number_max"] + 1):
+        if n in by_number:
+            lines.append(f"{n}: {driver_text(by_number[n], d['drivers'][by_number[n]])}")
+        else:
+            lines.append(f"{n}:")
+    # Fahrer ohne Nummer oder außerhalb des Bereichs nicht verschlucken
+    rest = [(uid, drv) for uid, drv in d["drivers"].items()
+            if not isinstance(drv.get("number"), int) or not s["number_min"] <= drv["number"] <= s["number_max"]]
+    if rest:
+        lines += ["", "**Ohne Nummer / außerhalb des Bereichs:**"] + [driver_line(uid, drv) for uid, drv in rest]
+    return lines
 
 
 async def refresh_driver_list(guild: discord.Guild, d: dict) -> None:
@@ -80,8 +104,7 @@ async def refresh_driver_list(guild: discord.Guild, d: dict) -> None:
     if channel is None:
         raise RuntimeError("Listen-Kanal nicht gefunden.")
 
-    entries = sorted(d["drivers"].items(), key=lambda e: e[1]["number"] if isinstance(e[1].get("number"), int) else 9999)
-    lines = [driver_line(uid, drv) for uid, drv in entries]
+    lines = list_lines(d)
 
     # Aufteilen, falls die Liste für eine Nachricht zu lang wird
     chunks: list[str] = []
@@ -100,7 +123,7 @@ async def refresh_driver_list(guild: discord.Guild, d: dict) -> None:
     for i, chunk in enumerate(chunks):
         embed = discord.Embed(color=Colors.list, description=chunk)
         if i == 0:
-            embed.title = f"🏁 GFSL Fahrerliste ({len(entries)})"
+            embed.title = f"🏁 GFSL Fahrerliste ({len(d['drivers'])} Fahrer)"
         if i == len(chunks) - 1:
             embed.set_footer(text="Wird automatisch aktualisiert")
             embed.timestamp = discord.utils.utcnow()

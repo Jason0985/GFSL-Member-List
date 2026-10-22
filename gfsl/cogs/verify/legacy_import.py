@@ -32,7 +32,8 @@ KEYWORDS = [
 REJECT_WORDS = ("abgelehnt", "denied", "declined", "rejected", "verweigert")
 MENTION_RE = re.compile(r"<@!?(\d{17,20})>")
 ID_RE = re.compile(r"(?<!\d)(\d{17,20})(?!\d)")
-NUMBER_RE = re.compile(r"(?<![\d:.,])#?(\d{1,3})(?![\d:.,])")
+# Nummer wie „17“, „#17“ oder „17:“ – aber keine Rundenzeit wie 1:05.013
+NUMBER_RE = re.compile(r"(?<![\d:.,])#?(\d{1,3})(?![\d.,]|:\d)")
 CSV_COLUMNS = ["user_id", "nummer", "name", "flagge", "plattform", "hinweis", "quelle"]
 
 
@@ -150,7 +151,8 @@ def parse_list(message: discord.Message) -> list[Record]:
 
 
 async def read_channel(channel: discord.TextChannel, limit: int, only_bots: bool) -> tuple[list[Record], int]:
-    """Liest den Kanal vom ältesten zum neuesten Eintrag. Gibt die Fahrer (zusammengeführt) und die Anzahl Nachrichten zurück."""
+    """Liest den Kanal vom ältesten zum neuesten Eintrag. Gibt die Fahrer (zusammengeführt) und die Anzahl Nachrichten zurück.
+    Zeilen ohne User (z. B. „10: Pierre Gasly“ oder „17: //“) gelten als freie Nummern und werden ignoriert."""
     merged: dict[str, Record] = {}
     count = 0
     async for message in channel.history(limit=limit, oldest_first=True):
@@ -241,8 +243,6 @@ def check(records: list[Record], guild: discord.Guild, d: dict, only_members: bo
             continue
         if not s["number_min"] <= r.number <= s["number_max"]:
             r.notes.append(f"#{r.number} liegt außerhalb von {s['number_min']}–{s['number_max']}")
-        if r.number in s["reserved_numbers"]:
-            r.notes.append(f"#{r.number} ist reserviert")
     return kept, gone
 
 
@@ -285,7 +285,7 @@ def preview_embed(records: list[Record], guild: discord.Guild, d: dict, read_inf
         "**Beispiele:**",
     ]
     for r in records[:15]:
-        lines.append(drivers.driver_line(r.user_id, {"number": r.number, "name": r.name, "flag": r.flag})
+        lines.append(drivers.driver_line(r.user_id, {"number": r.number, "name": r.name, "flag": r.flag, "platform": r.platform})
                      + (f" ⚠️ {'; '.join(r.notes)}" if r.notes else ""))
     if len(records) > 15:
         lines.append(f"… und {len(records) - 15} weitere (siehe CSV)")
