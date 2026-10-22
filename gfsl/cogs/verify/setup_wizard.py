@@ -89,9 +89,10 @@ async def post_panel(guild: discord.Guild, d: dict) -> str:
 
 
 class SetupWizard(discord.ui.View):
-    def __init__(self, guild: discord.Guild, user_id: int, step: int = 0):
+    def __init__(self, guild: discord.Guild, user_id: int, step: int = 0, channel: discord.abc.GuildChannel | None = None):
         super().__init__(timeout=900)
         self.guild = guild
+        self.channel = channel  # Kanal, in dem /verify setup ausgeführt wurde
         self.user_id = user_id
         self.step = step
         self.note: str | None = None
@@ -139,6 +140,17 @@ class SetupWizard(discord.ui.View):
         select.callback = callback
         self.add_item(select)
 
+        # Falls der Kanal im Menü nicht auftaucht: /verify setup im gewünschten Kanal ausführen und hier klicken
+        if self.channel is not None and self.channel.type in TEXT_CHANNELS and self.channel.id != current:
+            async def take_here(interaction: discord.Interaction):
+                self.s[key] = self.channel.id
+                if on_change:
+                    on_change()
+                self.save()
+                await self.refresh(interaction, "✅ Gespeichert.")
+            self.add_button(f"Diesen Kanal nehmen: #{self.channel.name}"[:80], discord.ButtonStyle.secondary,
+                            take_here, emoji="📍", row=row + 1)
+
     def add_role_select(self, key: str, placeholder: str, row: int):
         current = self.s[key]
         select = discord.ui.RoleSelect(placeholder=placeholder, row=row, min_values=0, max_values=1,
@@ -158,6 +170,9 @@ class SetupWizard(discord.ui.View):
         key, name = STEPS[self.step]
         embed = discord.Embed(color=Colors.info, title=f"⚙️ Einrichtung · Schritt {self.step + 1}/{len(STEPS)}: {name}")
         getattr(self, f"step_{key}")(embed)
+        if key in ("panel_channel", "mod_channel", "list_channel"):
+            embed.set_footer(text="Kanal fehlt im Menü? Namen ins Menü tippen, dann sucht Discord. Oder /verify setup "
+                                  "direkt im Kanal ausführen und „Diesen Kanal nehmen“ klicken.")
         if self.note:
             embed.description = f"{self.note}\n\n{embed.description}"
             self.note = None
@@ -211,7 +226,7 @@ class SetupWizard(discord.ui.View):
 
     def step_list_channel(self, embed: discord.Embed):
         embed.description = (
-            "Wo soll die **Fahrerliste** (Nummer, Flagge, Name) stehen? Sie aktualisiert sich automatisch.\n"
+            "Wo soll die **Fahrerliste** (Nummer, Flagge, @User, Plattform) stehen? Sie aktualisiert sich automatisch.\n"
             "Am besten ein eigener Kanal, in dem sonst niemand schreibt.\n\n"
             f"**Aktuell:** {channel_status(self.guild, self.s['list_channel_id'], PERMS_LIST)}"
         )

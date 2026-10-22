@@ -163,7 +163,7 @@ class VerifyCog(commands.Cog):
     @app_commands.describe(schritt="Direkt zu einem Schritt springen")
     @app_commands.choices(schritt=STEP_CHOICES)
     async def setup(self, interaction: discord.Interaction, schritt: app_commands.Choice[int] | None = None):
-        wizard = SetupWizard(interaction.guild, interaction.user.id, schritt.value if schritt else 0)
+        wizard = SetupWizard(interaction.guild, interaction.user.id, schritt.value if schritt else 0, interaction.channel)
         await interaction.response.send_message(embed=wizard.render(), view=wizard, ephemeral=True)
 
     @verify.command(name="einstellungen", description="Zeigt alle aktuellen Einstellungen")
