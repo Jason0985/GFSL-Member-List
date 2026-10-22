@@ -7,7 +7,7 @@ from discord.ext import commands
 
 from gfsl import storage
 
-from . import data, drivers, flow
+from . import data, drivers, flow, option_roles
 from . import legacy_import as imp
 from . import questions as Q
 from .constants import MAX_QUESTIONS, Colors
@@ -199,11 +199,26 @@ class VerifyCog(commands.Cog):
             q["max"] = None if maximum == -1 else maximum
         if feld:
             q["purpose"] = feld.value
+        option_roles.prune(q)
         if err := Q.validate(q, d["questions"]):
             return await reply(interaction, f"❌ {err}")
         d["questions"][idx] = q
         storage.save()
         await reply(interaction, f"✅ Frage geändert:\n{Q.describe(q, idx, d['settings'])}")
+
+    @fragen.command(name="rollen", description="Rollen je Antwort festlegen, z. B. PlayStation → @PS-Fahrer")
+    @app_commands.describe(nr="Nummer der Frage (Auswahl, Flagge oder Ja/Nein)")
+    @app_commands.autocomplete(nr=question_autocomplete)
+    async def rollen(self, interaction: discord.Interaction, nr: int):
+        d = data.get(interaction.guild_id)
+        idx = question_index(d, nr)
+        if idx is None:
+            return await reply(interaction, "Diese Nummer gibt es nicht. Schau mit `/fragen liste` nach.")
+        q = d["questions"][idx]
+        if q["type"] not in option_roles.ROLE_TYPES:
+            return await reply(interaction, "Rollen gehen nur bei Fragen vom Typ Auswahl, Flagge oder Ja/Nein.")
+        view = option_roles.OptionRolesView(interaction.guild, interaction.user.id, d, q["id"])
+        await interaction.response.send_message(embed=view.render(), view=view, ephemeral=True)
 
     @fragen.command(name="verschieben", description="Reihenfolge ändern")
     @app_commands.describe(nr="Nummer der Frage", position="Neue Position")
@@ -286,6 +301,11 @@ class VerifyCog(commands.Cog):
 
         warnings = [w for w in (await drivers.set_nickname(user, d["settings"]["nickname_template"], drv),
                                 await self.refresh_list(interaction.guild, d)) if w]
+        # Rollen je Antwort anpassen; bei geänderter Plattform/Flagge die alte Rolle entfernen
+        report = option_roles.SyncReport()
+        await option_roles.sync_member(user, d, option_roles.mapped_questions(d["questions"]), report,
+                                       remove_others=bool(plattform or flagge))
+        warnings += list(dict.fromkeys(report.errors))
         if nummer in d["settings"]["reserved_numbers"]:
             warnings.append(f"#{nummer} steht auf der Reserviert-Liste.")
         await interaction.followup.send(f"✅ {user.mention} ist jetzt **#{nummer}**." + "".join(f"\n⚠️ {w}" for w in warnings), ephemeral=True)
@@ -302,6 +322,17 @@ class VerifyCog(commands.Cog):
         nr = f", #{drv['number']} ist wieder frei" if drv.get("number") is not None else ""
         await interaction.followup.send(f"🗑️ {user.mention} ausgetragen{nr}. Rollen und Nickname wurden nicht verändert."
                                         + (f"\n⚠️ {err}" if err else ""), ephemeral=True)
+
+    @fahrer.command(name="rollen_sync", description="Gibt allen eingetragenen Fahrern die Rollen passend zu ihrer Auswahl (z. B. Plattform)")
+    @app_commands.describe(andere_entfernen="Rollen anderer Optionen entfernen, z. B. bei Plattformwechsel (Standard: nein)")
+    async def rollen_sync(self, interaction: discord.Interaction, andere_entfernen: bool = False):
+        d = data.get(interaction.guild_id)
+        questions = option_roles.mapped_questions(d["questions"])
+        if not questions:
+            return await reply(interaction, "Noch keine Rollen festgelegt. Erst mit `/fragen rollen` einstellen.")
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        report = await option_roles.sync_all(interaction.guild, d, questions, andere_entfernen)
+        await interaction.followup.send(report.text()[:2000], ephemeral=True)
 
     @fahrer.command(name="nummern", description="Übersicht aller Nummern: frei, vergeben, reserviert")
     @app_commands.describe(oeffentlich="Für alle sichtbar in den Kanal posten")

@@ -82,12 +82,14 @@ def describe(q: dict, index: int, settings: dict) -> str:
         opts = options_for(q)
         txt = f"Standard-Flaggenliste ({len(opts)} Länder)" if q["type"] == "flag" and not q["options"] else ", ".join(opts)
         line += f"\n└ Optionen: {txt}"
+    if roles := q.get("option_roles"):
+        line += "\n└ Rollen: " + ", ".join(f"{o} → <@&{rid}>" for o, rid in roles.items())
     return line
 
 
 def new_question(qid: int, type_: str, label: str, **extra) -> dict:
     q = {"id": qid, "type": type_, "label": label, "hint": None, "required": True,
-         "options": [], "min": None, "max": None, "purpose": "none"}
+         "options": [], "min": None, "max": None, "purpose": "none", "option_roles": {}}
     q.update(extra)
     return q
 

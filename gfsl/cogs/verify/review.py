@@ -6,7 +6,7 @@ import discord
 
 from gfsl import storage
 
-from . import data, drivers
+from . import data, drivers, option_roles
 from . import questions as Q
 from .constants import Colors
 
@@ -186,6 +186,10 @@ async def accept(interaction: discord.Interaction, d: dict, app: dict):
                 await (member.add_roles if add else member.remove_roles)(role, reason="GFSL Verify")
             except discord.HTTPException as e:
                 warnings.append(f"Rolle {role.mention} nicht {'vergeben' if add else 'entfernt'}: {e.text or e}")
+        # Rollen je Antwort, z. B. PlayStation/Xbox/PC
+        report = option_roles.SyncReport()
+        await option_roles.sync_member(member, d, option_roles.mapped_questions(d["questions"]), report)
+        warnings += list(dict.fromkeys(report.errors))
 
     number_line = f"**Fahrernummer:** #{number}" if number is not None else None
     embed = await build_summary(interaction.client, interaction.guild, d, app, Colors.ok, f"✅ Verifiziert von {interaction.user.mention}", number_line)

@@ -228,7 +228,8 @@ class SetupWizard(discord.ui.View):
             "zum Leeren die Auswahl im Menü entfernen.\n\n"
             f"**Rolle bei Freigabe:** {role_status(self.guild, s['verified_role_id'])}\n"
             f"**Rolle entfernen** (z. B. Unverifiziert): {role_status(self.guild, s['remove_role_id'])}\n"
-            f"**Mod-Rolle** (darf Anträge bearbeiten): {role_status(self.guild, s['mod_role_id'], assigned=False)}"
+            f"**Mod-Rolle** (darf Anträge bearbeiten): {role_status(self.guild, s['mod_role_id'], assigned=False)}\n\n"
+            "Rollen je Antwort (z. B. PlayStation → @PS-Fahrer) stellst du mit `/fragen rollen` ein."
         )
         self.add_role_select("verified_role_id", "Rolle bei Freigabe …", 0)
         self.add_role_select("remove_role_id", "Rolle, die entfernt wird …", 1)
@@ -256,7 +257,7 @@ class SetupWizard(discord.ui.View):
         embed.description = (
             (("\n".join(lines)) if qs else "Noch keine Fragen.")
             + f"\n\n**{len(qs)}/{MAX_QUESTIONS} Fragen.** Fragen änderst du mit `/fragen neu`, `/fragen bearbeiten`, "
-            "`/fragen verschieben` und `/fragen entfernen`. Mit **Testlauf** gehst du die Verifizierung selbst durch, "
+            "`/fragen verschieben` und `/fragen entfernen`, Rollen je Antwort (z. B. Plattform) mit `/fragen rollen`. Mit **Testlauf** gehst du die Verifizierung selbst durch, "
             "ohne dass etwas gespeichert wird."
         )
 

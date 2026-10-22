@@ -93,10 +93,12 @@ Alle Befehle sind nur für Leute mit „Server verwalten“ sichtbar. Das kannst
 | `/fragen vorschau` | Testlauf: die Verifizierung selbst durchgehen, es wird nichts gespeichert. |
 | `/fragen neu` | Neue Frage: `typ`, `frage` (max. 45 Zeichen), optional `hinweis` (max. 100), `pflicht`, `optionen`, `min`, `max`, `feld`, `position`. |
 | `/fragen bearbeiten nr:` | Einzelne Teile ändern (`hinweis:-` bzw. `optionen:-` leert das Feld, `min:-1`/`max:-1` entfernt die Grenze). |
+| `/fragen rollen nr:` | Rollen je Antwort festlegen, z. B. PlayStation → @PS-Fahrer (siehe unten). |
 | `/fragen verschieben` / `entfernen` | Reihenfolge ändern bzw. Frage löschen. |
 | `/fragen standard` | Lädt die GFSL-Startfragen (ersetzt alle aktuellen). |
 | `/fahrer setzen` | Fahrer manuell eintragen oder Nummer ändern. Beim Tippen werden freie Nummern und Flaggen vorgeschlagen. |
 | `/fahrer entfernen` | Fahrer austragen, die Nummer wird wieder frei. |
+| `/fahrer rollen_sync` | Gibt allen eingetragenen Fahrern die Rollen passend zu ihrer Auswahl, auch nachträglich. |
 | `/fahrer nummern` | Übersicht aller Nummern (frei, vergeben, reserviert), optional öffentlich. |
 | `/fahrer aktualisieren` | Fahrerliste neu aufbauen. |
 | `/fahrer export` | Alle Fahrer als CSV (Excel). |
@@ -125,6 +127,21 @@ Discord erlaubt pro Formular 5 Felder. Die Überschrift einer Frage darf höchst
 - **Flagge**: steht in der Fahrerliste vor dem Namen und ist als `{flagge}` im Nickname verfügbar.
 - **Plattform**: wird gespeichert und ist als `{plattform}` im Nickname verfügbar.
 
+### Rollen je Antwort (z. B. Plattform)
+
+Bei Fragen vom Typ Auswahl, Flagge oder Ja/Nein kann jede Option eine Rolle bekommen:
+
+```
+/fragen rollen nr:1        → Option wählen (z. B. PlayStation) → Rolle wählen (z. B. @PS-Fahrer)
+```
+
+- Beim **Akzeptieren** bekommt der Fahrer die Rolle zu seiner Auswahl.
+- **Bestehende Fahrer:** `/fahrer rollen_sync` oder der Button „Auf alle Fahrer anwenden“ vergibt fehlende Rollen. Die Auswahl kommt aus den Fahrerdaten (Plattform/Flagge aus Import, CSV oder `/fahrer setzen`), sonst aus der letzten Verifizierung.
+- Hat ein Fahrer keine gespeicherte Plattform, aber schon genau eine der Plattform-Rollen, übernimmt der Bot die Plattform von dort.
+- Fahrer ganz ohne Angabe werden aufgelistet. Nachtragen geht mit `/fahrer setzen plattform:`, das passt die Rolle sofort an.
+- `andere_entfernen:True` nimmt Rollen anderer Optionen weg, z. B. die PS-Rolle nach einem Wechsel auf PC.
+- Schreibweisen wie „PS5“ oder „ps4“ werden „PlayStation“ zugeordnet.
+
 ## Altdaten vom Melpo-Bot übernehmen
 
 Der Bot liest die alten Nachrichten im Kanal vom ältesten bis zum neuesten Eintrag. Spätere Nachrichten überschreiben frühere, so landet der **aktuelle Stand** in der Datenbank.
@@ -140,4 +157,4 @@ Der Bot liest die alten Nachrichten im Kanal vom ältesten bis zum neuesten Eint
 - Stimmt etwas nicht, öffnest du die CSV in Excel, korrigierst sie und lädst sie mit `/fahrer import_csv` hoch.
 - Stehen die Nummern schon in den Nicknames (`#17 | Name`), geht auch `/fahrer import_nicknames rolle:@Fahrer`.
 
-Rollen und Nicknames werden beim Import **nicht** verändert. Erkennt der Bot nichts, schick ein Beispiel einer alten Melpo-Nachricht (Screenshot oder kopierter Text), dann lässt sich die Erkennung in `legacy_import.py` anpassen.
+Rollen und Nicknames werden beim Import **nicht** verändert. Die Plattform-Rollen vergibst du danach mit `/fahrer rollen_sync`. Erkennt der Bot nichts, schick ein Beispiel einer alten Melpo-Nachricht (Screenshot oder kopierter Text), dann lässt sich die Erkennung in `legacy_import.py` anpassen.
