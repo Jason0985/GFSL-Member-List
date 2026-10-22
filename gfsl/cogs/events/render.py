@@ -1,4 +1,4 @@
-"""Darstellung im Stil von Raid-Helper: Teams als Spalten mit Icons, Ersatzfahrer extra, Zähler oben."""
+"""Darstellung im Stil von Raid-Helper: Teams als Spalten mit Icons, Ersatzfahrer extra, Zähler unten."""
 from datetime import datetime
 
 import discord
@@ -82,7 +82,6 @@ def event_embed(guild: discord.Guild | None, d: dict, ev: dict, hover: bool = Tr
         f"📅 **<t:{start_ts}:D>**　🕗 **<t:{start_ts}:t> Uhr**　⏳ <t:{start_ts}:R>",
         f"📝 Anmeldefrist: **<t:{deadline_ts}:f>** "
         + ("· **abgelaufen – Q-Sperre**" if deadline_passed else f"(<t:{deadline_ts}:R>)"),
-        f"👥 **{c['yes']}** angemeldet　❔ {c['maybe']} vielleicht　❌ {c['no']} abgemeldet",
         HR,
     ]
     embed = discord.Embed(color=COLOR.get(ev["status"], 0xE10600), description="\n".join(head)[:4096])
@@ -122,12 +121,13 @@ def event_embed(guild: discord.Guild | None, d: dict, ev: dict, hover: bool = Tr
     if url := D.image_url(D.field(d, ev, "image")):
         spacer(embed)
         embed.set_image(url=url)
+    # Zähler ganz unten, damit man sie auf einen Blick sieht
+    footer = f"✅ {c['yes']} angemeldet  ·  ❔ {c['maybe']} vielleicht  ·  ❌ {c['no']} abgemeldet"
     if ev["status"] == "closed":
-        embed.set_footer(text="🔒 Anmeldung geschlossen")
+        footer = "🔒 Anmeldung geschlossen  ·  " + footer
     elif ev["status"] == "planned":
-        embed.set_footer(text=f"🗓️ Wird am {t['post'].strftime('%d.%m. um %H:%M')} gepostet · Event #{ev['id']}")
-    else:
-        embed.set_footer(text="Anmelden · Vielleicht · Abmelden – mit den Buttons unten")
+        footer = f"🗓️ Wird am {t['post'].strftime('%d.%m. um %H:%M')} gepostet · Event #{ev['id']}"
+    embed.set_footer(text=footer)
 
     # Discord erlaubt 6000 Zeichen pro Embed: bei sehr vielen Anmeldungen ohne Hover-Zeiten
     if hover and len(embed) > 5900:
