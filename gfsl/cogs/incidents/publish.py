@@ -4,6 +4,7 @@ import io
 import logging
 import os
 import re
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import discord
@@ -15,6 +16,7 @@ from .ticket import add_log, lock, now, parties
 
 log = logging.getLogger("gfsl.incidents")
 URL_RE = re.compile(r"https?://[^\s<>()]+")
+MENTION_RE = re.compile(r"<@!?(\d+)>")
 TZ = ZoneInfo(os.environ.get("BOT_TIMEZONE", "Europe/Berlin"))  # Uhrzeiten im Protokoll in deutscher Zeit
 
 
@@ -81,8 +83,15 @@ def embed_text(e: discord.Embed) -> str:
     return " | ".join(p.replace("\n", " / ") for p in parts if p)
 
 
+def plain(text: str) -> str:
+    """<@123> -> @123 für das Text-Protokoll."""
+    return MENTION_RE.sub(lambda m: "@" + m.group(1), text)
+
+
 def transcript(messages: list[discord.Message], t: dict) -> discord.File:
-    lines = [f"Rennvorfall {D.number(t)} – Protokoll", ""]
+    lines = [f"Rennvorfall {D.number(t)} – Protokoll", "", "Verlauf:"]
+    lines += [f"  {datetime.fromtimestamp(ts, TZ).strftime('%d.%m.%Y %H:%M:%S')}  {plain(text)}" for ts, text in t["log"]]
+    lines += ["", "Nachrichten:"]
     for m in messages:
         when = m.created_at.astimezone(TZ).strftime("%d.%m.%Y %H:%M:%S")
         text = m.content or (embed_text(m.embeds[0]) if m.embeds else "")
@@ -146,6 +155,7 @@ async def archive(guild: discord.Guild, t: dict, s: dict, messages, summary: dis
         starter = await channel.send(embed=summary, file=file, allowed_mentions=discord.AllowedMentions.none())
         thread = await starter.create_thread(name=name, auto_archive_duration=10080)
     entry_ids = {e["message_id"] for e in t["entries"].values()}
+    messages = [m for m in messages if m.id != t.get("status_message_id")]  # die Übersicht oben nicht mitkopieren
     missing = await copy_to_archive(thread, messages, guild.me.id, guild.filesize_limit, entry_ids)
     try:
         await thread.edit(archived=True, locked=True)
@@ -165,7 +175,7 @@ async def close_ticket(interaction: discord.Interaction, tid: str, decision: str
     async with lock(guild.id, tid):
         channel = interaction.channel
         t.update(phase="closed", decision=decision, penalty=penalty, closed_at=now(), closed_by=str(interaction.user.id))
-        await channel.send(add_log(t, f"Fall abgeschlossen von <@{interaction.user.id}>"), allowed_mentions=discord.AllowedMentions.none())
+        add_log(t, f"Entscheidung eingetragen von <@{interaction.user.id}>")
         storage.save()
 
         messages, links, attachments = await collect(channel, t)
@@ -189,7 +199,10 @@ async def close_ticket(interaction: discord.Interaction, tid: str, decision: str
             except discord.HTTPException as e:
                 log.warning("Entscheidung #%s nicht veröffentlicht: %s", t["id"], e)
 
-        archive_url, complete = await archive(guild, t, s, messages, summary_embed(t, guild, links, too_big))
+        internal = summary_embed(t, guild, links, too_big)
+        internal.add_field(name="🕒 Verlauf", inline=False,
+                           value="\n".join(f"<t:{ts}:f> · {text}" for ts, text in t["log"])[-1024:])
+        archive_url, complete = await archive(guild, t, s, messages, internal)
         storage.save()
 
     notes = [f"✅ Entscheidung veröffentlicht: {result_url}" if result_url else "⚠️ Entscheidung nicht veröffentlicht – Ergebnis-Kanal fehlt oder mir fehlen dort Rechte (siehe `/rennvorfall einstellungen`)."]

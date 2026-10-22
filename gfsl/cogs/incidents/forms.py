@@ -9,7 +9,7 @@ from gfsl import storage
 
 from . import data as D
 from .publish import URL_RE, download
-from .ticket import add_log, lock, now, pending, repost_status
+from .ticket import add_log, lock, now, pending, update_control
 
 
 def entry_embed(guild: discord.Guild, t: dict, uid: str, kind: str, fields: dict, links: list[str],
@@ -22,13 +22,13 @@ def entry_embed(guild: discord.Guild, t: dict, uid: str, kind: str, fields: dict
                           description=fields["text"][:4000])
     if report:
         embed.add_field(name="Beschuldigt", value=", ".join(f"<@{u}>" for u in fields["accused"]), inline=False)
-        embed.add_field(name="Vorfall", value=fields["incident"][:1024], inline=False)
     if links:
         embed.add_field(name="🎥 Videos & Links", value="\n".join(f"• {u}" for u in links)[:1024], inline=False)
     if too_big:
         embed.add_field(name="⚠️ Nicht angehängt (zu groß)", value="\n".join(f"• {n}" for n in too_big)[:1024]
                         + "\nBitte als YouTube-Link nachreichen.", inline=False)
-    embed.add_field(name="Eingetragen", value=f"<t:{now()}:f>", inline=False)
+    embed.set_footer(text="Eingetragen")
+    embed.timestamp = discord.utils.utcnow()  # Discord zeigt die Uhrzeit in der Zeitzone des Lesers
     return embed
 
 
@@ -38,16 +38,15 @@ class EntryForm(discord.ui.Modal):
         super().__init__(title=f"Rennvorfall {D.number(t)} – {'Meldung' if report else 'Aussage'}", timeout=1800)
         self.tid, self.uid, self.kind = t["id"], uid, kind
         prev = t["entries"].get(uid, {}).get("fields", {})
-        self.accused = self.incident = None
+        self.accused = None
         if report:
             self.accused = discord.ui.UserSelect(min_values=1, max_values=10, required=True,
                                                  default_values=[discord.Object(int(u)) for u in prev.get("accused", [])])
-            self.incident = discord.ui.TextInput(max_length=200, default=prev.get("incident"),
-                                                 placeholder="z. B. Abu Dhabi, Runde 3, Kurve 1")
             self.add_item(discord.ui.Label(text="Beschuldigte", description="Wen betrifft der Vorfall? Mehrere möglich",
                                            component=self.accused))
-            self.add_item(discord.ui.Label(text="Vorfall", component=self.incident))
-        self.text = discord.ui.TextInput(style=discord.TextStyle.long, max_length=2000, default=prev.get("text"))
+        self.text = discord.ui.TextInput(style=discord.TextStyle.long, max_length=2000, default=prev.get("text"),
+                                         placeholder="Was ist passiert? Gerne mit Runde/Kurve, falls du es weißt."
+                                         if report else "Wie hast du die Situation erlebt?")
         self.links = discord.ui.TextInput(style=discord.TextStyle.long, required=False, max_length=500, default=prev.get("links"),
                                           placeholder="https://youtu.be/… (einer pro Zeile)")
         self.files = discord.ui.FileUpload(required=False, min_values=0, max_values=5)
@@ -71,7 +70,7 @@ class EntryForm(discord.ui.Modal):
             if not accused:
                 return await interaction.response.send_message("❌ Bitte mindestens einen Beschuldigten (nicht dich selbst) auswählen.",
                                                                ephemeral=True)
-            fields.update(accused=[str(u.id) for u in accused], incident=self.incident.value.strip())
+            fields["accused"] = [str(u.id) for u in accused]
         links = list(dict.fromkeys(u.rstrip(".,!?") for u in URL_RE.findall(fields["links"])))
         if fields["links"] and not links:
             return await interaction.response.send_message("❌ Bei den Video-Links bitte vollständige Links angeben (https://…).",
@@ -88,23 +87,23 @@ class EntryForm(discord.ui.Modal):
                 except discord.HTTPException:
                     uploads = []
             files, too_big = await download(uploads, guild.filesize_limit)
-            if old:
+            embed = entry_embed(guild, t, self.uid, self.kind, fields, links, [a.filename for a in too_big])
+            msg = None
+            if old:  # Karte an derselben Stelle aktualisieren statt neu posten
                 try:
-                    await channel.get_partial_message(old["message_id"]).delete()
-                except discord.HTTPException:
-                    pass
-            msg = await channel.send(embed=entry_embed(guild, t, self.uid, self.kind, fields, links, [a.filename for a in too_big]),
-                                     files=files, allowed_mentions=discord.AllowedMentions.none())
+                    msg = await channel.get_partial_message(old["message_id"]).edit(embed=embed, attachments=files)
+                except discord.NotFound:
+                    msg = None
+            if msg is None:
+                msg = await channel.send(embed=embed, files=files, allowed_mentions=discord.AllowedMentions.none())
             t["entries"][self.uid] = {"message_id": msg.id, "at": now(), "fields": fields, "links": links}
             what = "Meldung" if report else "Aussage"
-            await channel.send(add_log(t, f"{what} von <@{self.uid}> {'aktualisiert' if old else 'eingetragen'}"),
-                               allowed_mentions=discord.AllowedMentions.none())
-            await repost_status(channel, t)
+            add_log(t, f"{what} von <@{self.uid}> {'geändert' if old else 'eingetragen'}")
+            await update_control(channel, t)
             storage.save()
 
         button = "Einsendung endgültig abschicken" if report else "Aussage endgültig abschicken"
-        text = (f"✅ {what} eingetragen. Schau sie dir im Ticket an und klicke dann **{button}**.\n"
-                "Bis dahin kannst du sie jederzeit mit **📝 Aussage anpassen** ändern.")
+        text = f"✅ Gespeichert – steht jetzt im Ticket. Passt alles? Dann oben **{button}**."
         if too_big:
             text += (f"\n⚠️ Zu groß zum Anhängen (max. {guild.filesize_limit // 1_048_576} MB): "
                      + ", ".join(a.filename for a in too_big) + " – bitte als YouTube-Link angeben.")

@@ -55,10 +55,9 @@ def pending(t: dict) -> list[str]:
     return [u for u in [*t["accused"], *t["extra"]] if u not in t["submitted"] and u not in t["skipped"]]
 
 
-def add_log(t: dict, text: str) -> str:
-    ts = now()
-    t["log"].append([ts, text])
-    return f"🕒 <t:{ts}:f> – {text}"
+def add_log(t: dict, text: str):
+    """Schritt mit Uhrzeit festhalten – steht im Verlauf der Übersicht und im Archiv."""
+    t["log"].append([now(), text])
 
 
 # ---------- Panel ----------
@@ -75,43 +74,51 @@ class PanelView(discord.ui.View):
         self.add_item(button)
 
 
-# ---------- Status im Ticket ----------
+# ---------- Übersicht oben im Ticket ----------
 
 def state(u: str, t: dict) -> str:
     if u in t["submitted"]:
-        return f"✅ abgeschickt <t:{t['submitted'][u]}:f>"
+        return f"✅ abgeschickt <t:{t['submitted'][u]}:R>"
     if u in t["skipped"]:
         return "⏭️ ohne Aussage"
     if u in t["entries"]:
-        return f"📝 Formular ausgefüllt <t:{t['entries'][u]['at']}:f> – noch nicht abgeschickt"
-    return "⏳ Formular noch offen"
+        return "📝 eingetragen, noch nicht abgeschickt"
+    return "⏳ noch offen"
 
 
-def who(uids: list[str], t: dict) -> str:
-    return "\n".join(f"<@{u}> – {state(u, t)}" for u in uids) or "—"
+def mentions(uids: list[str]) -> str:
+    return ", ".join(f"<@{u}>" for u in uids)
 
 
-INSTRUCTIONS = {
-    "reporter": ("**{reporter}:** Öffne mit **📝 Aussage eintragen** das Meldeformular – das geht jederzeit, auch später, "
-                 "und du kannst es beliebig oft ändern. Wenn alles passt: **Einsendung endgültig abschicken**."),
-    "statements": ("**Beschuldigte:** Schaut euch die Meldung oben an, füllt über **📝 Aussage eintragen** eure Aussage "
-                   "aus (Text + Video/YouTube-Link) und klickt dann **Aussage endgültig abschicken**. Danach werdet ihr aus dem "
-                   "Ticket entfernt.\n**Stewards:** Kommt kein Gegenclip, geht es mit **Ohne Gegenclip bewerten** weiter."),
-    "review": ("**Ligaleitung & Stewards:** Alle Aussagen sind da. Beratet hier und tragt die Entscheidung mit "
-               "**⚖️ Entscheidung eintragen** ein. Weitere Personen holt ihr mit **Person hinzufügen** dazu."),
-}
+def instructions(t: dict) -> str:
+    """Genau eine kurze Anleitung – nur für den, der gerade dran ist."""
+    if t["phase"] == "reporter":
+        return (f"**{mentions([t['reporter_id']])} – so geht's:**\n"
+                "1. **📝 Aussage eintragen:** Beschuldigte, Beschreibung, Video\n"
+                "2. Deine Meldung erscheint unten – kurz prüfen\n"
+                "3. **Einsendung endgültig abschicken**\n"
+                "-# Du kannst jederzeit später weitermachen. Nach dem Abschicken werden die Beschuldigten dazugeholt und du verlässt das Ticket.")
+    if t["phase"] == "statements":
+        return (f"**{mentions(pending(t))} – ihr seid dran:**\n"
+                "1. Meldung unten lesen\n"
+                "2. **📝 Aussage eintragen:** deine Sicht + Video\n"
+                "3. **Aussage endgültig abschicken**\n"
+                "-# Stewards: Kommt kein Gegenclip, geht es mit „Ohne Gegenclip bewerten“ weiter.")
+    if t["phase"] == "review":
+        return ("**Ligaleitung & Stewards – alles da:**\n"
+                "Meldung und Aussagen stehen unten. Beratet hier und tragt dann die **⚖️ Entscheidung** ein.")
+    return ""
 
 
-def status_embed(t: dict) -> discord.Embed:
-    embed = discord.Embed(color=0xF59E0B if t["phase"] != "closed" else 0x22C55E,
-                          title=f"⚖️ Rennvorfall {D.number(t)} · {D.PHASES[t['phase']]}",
-                          description=INSTRUCTIONS.get(t["phase"], "").format(reporter=f"<@{t['reporter_id']}>"))
-    reporter = t["reporter_id"]
-    embed.add_field(name="Einsender", value=f"<@{reporter}> – {state(reporter, t)}", inline=False)
-    embed.add_field(name="Beschuldigt", value=who(t["accused"], t) if t["accused"] else "— (wird beim Abschicken ausgewählt)", inline=False)
-    if t["extra"]:
-        embed.add_field(name="Hinzugefügt", value=who(t["extra"], t), inline=False)
-    embed.add_field(name="Eröffnet", value=f"<t:{t['opened_at']}:f>", inline=False)
+def control_embed(t: dict) -> discord.Embed:
+    embed = discord.Embed(color={"reporter": 0x3B82F6, "statements": 0x8B5CF6, "review": 0xF59E0B}.get(t["phase"], 0x22C55E),
+                          title=f"⚖️ Rennvorfall {D.number(t)} · {D.PHASES[t['phase']]}", description=instructions(t))
+    lines = [f"📨 **Einsender:** <@{t['reporter_id']}> · {state(t['reporter_id'], t)}"]
+    lines += [f"🗣️ **Beschuldigt:** <@{u}> · {state(u, t)}" for u in t["accused"]]
+    lines += [f"➕ **Hinzugefügt:** <@{u}> · {state(u, t)}" for u in t["extra"]]
+    embed.add_field(name="Stand", value="\n".join(lines)[:1024], inline=False)
+    history = [f"<t:{ts}:f> · {text}" for ts, text in t["log"][-8:]]
+    embed.add_field(name="🕒 Verlauf", value="\n".join(history)[:1024] or "—", inline=False)
     return embed
 
 
@@ -170,21 +177,28 @@ def form_label(t: dict) -> str:
     return "Aussage eintragen"
 
 
-async def repost_status(channel: discord.TextChannel, t: dict):
-    """Status mit Buttons immer als letzte Nachricht, damit die Buttons unten erreichbar sind."""
+async def update_control(channel: discord.TextChannel, t: dict):
+    """Die Übersicht oben wird nur bearbeitet, nie neu gepostet."""
     if t.get("status_message_id"):
         try:
-            await channel.get_partial_message(t["status_message_id"]).delete()
-        except discord.HTTPException:
+            await channel.get_partial_message(t["status_message_id"]).edit(embed=control_embed(t), view=status_view(t))
+            storage.save()
+            return
+        except discord.NotFound:
             pass
-    msg = await channel.send(embed=status_embed(t), view=status_view(t), allowed_mentions=discord.AllowedMentions.none())
+    msg = await channel.send(embed=control_embed(t), view=status_view(t), allowed_mentions=discord.AllowedMentions.none())
     t["status_message_id"] = msg.id
     storage.save()
 
 
-async def say(channel: discord.TextChannel, text: str, ping_users: list[str] = (), ping_roles: list[int] = ()):
-    pings = " ".join([*(f"<@{u}>" for u in ping_users), *(f"<@&{r}>" for r in ping_roles)])
-    await channel.send(f"{pings}\n{text}" if pings else text,
+def control_link(channel: discord.TextChannel, t: dict) -> str:
+    return f"https://discord.com/channels/{channel.guild.id}/{channel.id}/{t['status_message_id']}"
+
+
+async def ping(channel: discord.TextChannel, t: dict, text: str, users: list[str] = (), roles: list[int] = ()):
+    """Kurzer Ping nur dann, wenn jemand etwas tun muss – mit Link zur Übersicht oben."""
+    who_ = " ".join([*(f"<@{u}>" for u in users), *(f"<@&{r}>" for r in roles)])
+    await channel.send(f"{who_} {text} ➡️ [Zur Übersicht]({control_link(channel, t)})",
                        allowed_mentions=discord.AllowedMentions(users=True, roles=True, everyone=False))
 
 
@@ -214,15 +228,10 @@ async def open_ticket(interaction: discord.Interaction):
         return await interaction.followup.send(f"⚠️ Ticket konnte nicht angelegt werden ({e.text or e}). Bitte der Ligaleitung Bescheid geben.",
                                                ephemeral=True)
     t["channel_id"] = channel.id
+    add_log(t, "Ticket eröffnet")
+    msg = await channel.send(content=f"<@{interaction.user.id}>", embed=control_embed(t), view=status_view(t))
+    t["status_message_id"] = msg.id
     storage.save()
-
-    await channel.send(
-        content=f"<@{interaction.user.id}>",
-        embed=discord.Embed(color=0xE10600, title=f"⚖️ Rennvorfall {D.number(t)}",
-                            description="Dein Ticket ist offen. Unten mit **📝 Aussage eintragen** die Meldung ausfüllen – "
-                                        "jetzt oder später. Du kannst hier auch zusätzlich schreiben oder Dateien posten."))
-    await channel.send(add_log(t, f"Ticket eröffnet von <@{interaction.user.id}>"), allowed_mentions=discord.AllowedMentions.none())
-    await repost_status(channel, t)
     await interaction.followup.send(f"✅ Dein Ticket: {channel.mention}", ephemeral=True)
 
 
@@ -283,12 +292,10 @@ async def on_submit(interaction: discord.Interaction, d: dict, t: dict):
         await channel.set_permissions(interaction.user, overwrite=REMOVED, reason="Einsendung abgeschickt")
         for m in accused:
             await channel.set_permissions(m, overwrite=PARTY, reason="Beschuldigt im Rennvorfall")
-        await channel.send(add_log(t, f"Einsendung von <@{t['reporter_id']}> abgeschickt – Einsender entfernt"),
-                           allowed_mentions=discord.AllowedMentions.none())
-        await say(channel, "Ihr wurdet in diesem Rennvorfall gemeldet. Bitte schaut euch die Meldung oben an, füllt über "
-                           "**📝 Aussage eintragen** eure Aussage aus und klickt dann **Aussage endgültig abschicken**.",
-                  ping_users=t["accused"])
-        await repost_status(channel, t)
+        add_log(t, "Meldung abgeschickt, Beschuldigte dazugeholt")
+        await update_control(channel, t)
+        await ping(channel, t, "– ihr wurdet in diesem Rennvorfall gemeldet. Bitte die Meldung lesen und eure Aussage eintragen.",
+                   users=t["accused"])
 
 
 async def on_cancel(interaction: discord.Interaction, d: dict, t: dict):
@@ -310,9 +317,8 @@ async def on_cancel(interaction: discord.Interaction, d: dict, t: dict):
 
 async def to_review(channel: discord.TextChannel, d: dict, t: dict, by: str):
     t["phase"] = "review"
-    await channel.send(add_log(t, by), allowed_mentions=discord.AllowedMentions.none())
-    await say(channel, "⚖️ **Bereit zur Bewertung.** Alle Teile sind da – ihr könnt beraten und die Entscheidung eintragen.",
-              ping_roles=d["settings"]["staff_role_ids"])
+    add_log(t, by)
+    await ping(channel, t, "– ⚖️ Rennvorfall bereit zur Bewertung.", roles=d["settings"]["staff_role_ids"])
 
 
 async def on_statement(interaction: discord.Interaction, d: dict, t: dict):
@@ -328,11 +334,10 @@ async def on_statement(interaction: discord.Interaction, d: dict, t: dict):
         channel = interaction.channel
         t["submitted"][uid] = now()
         await channel.set_permissions(interaction.user, overwrite=REMOVED, reason="Aussage abgeschickt")
-        await channel.send(add_log(t, f"Aussage von <@{uid}> abgeschickt – entfernt"),
-                           allowed_mentions=discord.AllowedMentions.none())
+        add_log(t, f"Aussage von <@{uid}> abgeschickt")
         if not pending(t):
             await to_review(channel, d, t, "Alle Aussagen sind da")
-        await repost_status(channel, t)
+        await update_control(channel, t)
 
 
 async def on_skip(interaction: discord.Interaction, d: dict, t: dict):
@@ -345,7 +350,7 @@ async def on_skip(interaction: discord.Interaction, d: dict, t: dict):
             t["skipped"].append(uid)
             await channel.set_permissions(discord.Object(int(uid)), overwrite=REMOVED, reason="Ohne Gegenclip bewertet")
         await to_review(channel, d, t, f"Ohne Gegenclip weiter (<@{interaction.user.id}>) – Ausstehende entfernt")
-        await repost_status(channel, t)
+        await update_control(channel, t)
 
 
 async def on_add(interaction: discord.Interaction, d: dict, t: dict):
@@ -363,12 +368,10 @@ async def on_add(interaction: discord.Interaction, d: dict, t: dict):
                 t["extra"].append(str(u.id))
                 await channel.set_permissions(u, overwrite=PARTY, reason="Zum Rennvorfall hinzugefügt")
             t["phase"] = "statements"
-            await channel.send(add_log(t, f"{', '.join(u.mention for u in new)} hinzugefügt von <@{i.user.id}>"),
-                               allowed_mentions=discord.AllowedMentions.none())
-            await say(channel, "Ihr wurdet zu diesem Rennvorfall dazugeholt. Bitte schaut euch alles oben an, füllt über "
-                               "**📝 Aussage eintragen** eure Sicht aus und klickt dann **Aussage endgültig abschicken**.",
-                      ping_users=[str(u.id) for u in new])
-            await repost_status(channel, t)
+            add_log(t, f"{', '.join(u.mention for u in new)} dazugeholt von <@{i.user.id}>")
+            await update_control(channel, t)
+            await ping(channel, t, "– ihr wurdet zu diesem Rennvorfall dazugeholt. Bitte alles lesen und eure Aussage eintragen.",
+                       users=[str(u.id) for u in new])
 
     await interaction.response.send_message("Wen möchtest du dazuholen (z. B. weitere Beteiligte oder für eine andere Sicht)?",
                                             ephemeral=True, view=PickUsersView("Personen auswählen …", "Hinzufügen", confirm))

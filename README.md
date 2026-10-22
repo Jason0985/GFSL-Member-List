@@ -303,7 +303,6 @@ Außerdem: `/rennvorfall einstellungen`, `/rennvorfall panel`, `/rennvorfall off
 1. **Vorfall melden** → privater Kanal für den Einsender, die Ligaleitung und die Stewards, mit Status und Buttons.
 2. **Einsender** öffnet mit **📝 Aussage eintragen** das Meldeformular. Das geht **jederzeit, auch später**. Danach heißt der Button **📝 Aussage anpassen**, und er kann es beliebig oft ändern. Es enthält:
    - **Beschuldigte** (Auswahl, mehrere möglich)
-   - **Vorfall**
    - **Vorfallbeschreibung**
    - **Video-Links**
    - **Video/Screenshots** (Upload)
@@ -318,7 +317,15 @@ Außerdem: `/rennvorfall einstellungen`, `/rennvorfall panel`, `/rennvorfall off
    - Im Archiv entsteht ein **Thread** mit dem kompletten Verlauf (Uhrzeiten, Texte, Dateien) und einem Protokoll als `.txt`.
    - Der Ticket-Kanal wird gelöscht.
 
-**Uhrzeiten:** Jeder Schritt wird im Ticket, im Status und im Archiv mit Uhrzeit festgehalten (eröffnet, abgeschickt, Aussagen, hinzugefügt, abgeschlossen).
+**Aufbau im Ticket:** Ganz oben steht eine **Übersicht**, die sich nur selbst aktualisiert und nie neu gepostet wird. Sie enthält:
+- eine kurze Anleitung für den, der gerade dran ist
+- den Stand aller Beteiligten
+- den Verlauf mit Uhrzeiten
+- die Buttons
+
+Darunter stehen die **Meldung** und die **Aussagen** als eigene Karten. Ändert jemand seine Aussage, wird seine Karte aktualisiert. Danach folgt die Diskussion. Pings gibt es nur, wenn jemand handeln muss, jeweils mit Link zur Übersicht.
+
+**Uhrzeiten:** Jeder Schritt steht mit Uhrzeit im Verlauf der Übersicht, in der Archiv-Zusammenfassung und im Protokoll.
 
 **Befangenheit:** Wer Einsender, Beschuldigter oder hinzugefügt ist, wird nach seinem Teil aus dem Ticket ausgesperrt. Das gilt auch, wenn er selbst Ligaleitung oder Steward ist.
 
