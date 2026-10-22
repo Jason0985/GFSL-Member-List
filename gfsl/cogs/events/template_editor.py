@@ -52,7 +52,7 @@ class TemplateEditor(discord.ui.View):
         t = {**D.TEMPLATE_DEFAULTS, **self.t}
         self.clear_items()
         channel = self.guild.get_channel(t["channel_id"] or 0)
-        pings = " ".join(f"<@&{r}>" for r in t["ping_role_ids"]) or "—"
+        pings = " ".join(f"<@&{r}>" for r in t["ping_role_ids"]) or "— (niemand, im Menü unten auswählen)"
         review = (f"an – DM {t['review_hours']} h vor dem Posten an <@{t['reminder_user_id']}>"
                   if t["review"] else "aus – wird automatisch gepostet")
         nudge = f"{t['nudge_hours']} h vor der Frist werden Fahrer ohne Rückmeldung angepingt" if t["nudge_hours"] else "aus"

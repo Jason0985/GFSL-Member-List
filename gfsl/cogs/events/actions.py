@@ -6,6 +6,7 @@ import time
 import discord
 
 from gfsl import storage
+from gfsl.permissions import is_admin
 
 from . import assign, render
 from . import data as D
@@ -35,17 +36,18 @@ def has_reserves(d: dict, ev: dict) -> bool:
 
 # ---------- Buttons ----------
 
+# Ohne Icons: Farbe + Text reichen, ein rotes ❌ auf rotem Button sieht man schlecht
 BUTTONS = {
-    "yes": ("Anmelden", discord.ButtonStyle.success, "✅"),
-    "maybe": ("Vielleicht", discord.ButtonStyle.secondary, "❔"),
-    "no": ("Abmelden", discord.ButtonStyle.danger, "❌"),
+    "yes": ("Anmelden", discord.ButtonStyle.success),
+    "maybe": ("Vielleicht", discord.ButtonStyle.secondary),
+    "no": ("Abmelden", discord.ButtonStyle.danger),
 }
 
 
 class SignupButton(discord.ui.DynamicItem[discord.ui.Button], template=r"ev:(?P<status>yes|maybe|no):(?P<ev>\d+)"):
     def __init__(self, status: str, ev_id: str):
-        label, style, emoji = BUTTONS[status]
-        super().__init__(discord.ui.Button(label=label, style=style, emoji=emoji, custom_id=f"ev:{status}:{ev_id}"))
+        label, style = BUTTONS[status]
+        super().__init__(discord.ui.Button(label=label, style=style, custom_id=f"ev:{status}:{ev_id}"))
         self.status = status
         self.ev_id = ev_id
 
@@ -57,11 +59,56 @@ class SignupButton(discord.ui.DynamicItem[discord.ui.Button], template=r"ev:(?P<
         await signup(interaction, self.ev_id, self.status)
 
 
+class AdminEditButton(discord.ui.DynamicItem[discord.ui.Button], template=r"ev:edit:(?P<ev>\d+)"):
+    """⚙️ am Event: Admins können Titel, Beschreibung, Start und Bild direkt hier ändern."""
+
+    def __init__(self, ev_id: str):
+        super().__init__(discord.ui.Button(emoji="⚙️", style=discord.ButtonStyle.secondary, custom_id=f"ev:edit:{ev_id}"))
+        self.ev_id = ev_id
+
+    @classmethod
+    async def from_custom_id(cls, interaction, item, match):
+        return cls(match["ev"])
+
+    async def callback(self, interaction: discord.Interaction):
+        if not is_admin(interaction):
+            return await interaction.response.send_message("⚙️ Das ist nur für Admins (Event bearbeiten).", ephemeral=True)
+        ev = D.get(interaction.guild_id)["events"].get(self.ev_id)
+        if ev is None or ev["status"] != "posted":
+            return await interaction.response.send_message("Dieses Event kann nicht mehr bearbeitet werden.", ephemeral=True)
+        from .review import EventEditModal  # review importiert actions, daher erst hier
+        await interaction.response.send_modal(EventEditModal(interaction.guild, self.ev_id))
+
+
 def signup_view(ev_id: str) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
     for status in BUTTONS:
         view.add_item(SignupButton(status, ev_id))
+    view.add_item(AdminEditButton(ev_id))
     return view
+
+
+async def rescheduled(guild: discord.Guild, d: dict, ev: dict):
+    """Start eines offenen Events geändert: Q-Sperren und Einteilung passend zur neuen Frist neu berechnen."""
+    async with lock(guild.id, ev["id"]):
+        deadline = render.times(d, ev)["deadline"]
+        for s in ev["signups"].values():
+            if s["status"] == "yes":
+                s["late"] = s["at"] >= deadline.timestamp()
+        if tu.now() < deadline and ev["deadline_done"]:
+            # Frist liegt wieder in der Zukunft: Einteilung erst zur neuen Frist
+            ev["deadline_done"] = ev["nudge_done"] = False
+            ev["assignments"] = {}
+            channel = guild.get_channel(ev.get("channel_id") or 0)
+            if channel and ev.get("assignment_message_id"):
+                try:
+                    await channel.get_partial_message(ev["assignment_message_id"]).edit(content=None, embed=discord.Embed(
+                        color=0x64748B, description=f"⏳ Termin verschoben – die Ersatzfahrer werden zur neuen Frist "
+                                                    f"<t:{tu.ts(deadline)}:f> neu eingeteilt."))
+                except discord.HTTPException:
+                    pass
+        storage.save()
+    await refresh(guild, d, ev)
 
 
 # ---------- Anmelden ----------

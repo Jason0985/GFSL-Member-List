@@ -145,8 +145,8 @@ class EventsCog(commands.Cog):
         d = D.get(interaction.guild_id)
         if any(c["role_id"] == rolle.id for c in assign.classes(d)):
             return await reply(interaction, f"{rolle.mention} ist schon eingetragen.")
-        if len(assign.classes(d)) >= 20:
-            return await reply(interaction, "Maximal 20 Klassen (Discord-Limit für die Übersicht).")
+        if len(assign.classes(d)) >= 14:
+            return await reply(interaction, "Maximal 14 Klassen (Discord erlaubt nur 25 Felder in der Übersicht).")
         try:
             icon = check_emoji(emoji)
         except ValueError:
@@ -210,7 +210,6 @@ class EventsCog(commands.Cog):
         d = D.get(interaction.guild_id)
         t = D.new_template(d, name, interaction.user.id)
         t["channel_id"] = kanal.id
-        t["ping_role_ids"] = [c["role_id"] for c in assign.classes(d)][:10]
         storage.save()
         editor = TemplateEditor(interaction.guild, interaction.user.id, t["id"])
         editor.note = "✅ Angelegt. Jetzt Texte & Zeiten einstellen, danach Rennen mit `/kalender` eintragen."
@@ -373,7 +372,7 @@ class EventsCog(commands.Cog):
         storage.save()
         await interaction.response.defer(ephemeral=True, thinking=True)
         if ev["status"] == "posted":
-            await actions.refresh(interaction.guild, d, ev)
+            await actions.rescheduled(interaction.guild, d, ev)
         lines = [f"• {D.field(d, e, 'title')} → {tu.pretty(e['starts_at'])}" for e in moved]
         await interaction.followup.send((f"✅ {len(moved)} Rennen verschoben:\n" + "\n".join(lines))[:2000], ephemeral=True)
 

@@ -71,7 +71,6 @@ class DecisionButton(discord.ui.DynamicItem[discord.ui.Button], template=r"gv:(?
         super().__init__(discord.ui.Button(
             label="Akzeptieren" if accept else "Ablehnen",
             style=discord.ButtonStyle.success if accept else discord.ButtonStyle.danger,
-            emoji="✅" if accept else "❌",
             custom_id=f"gv:{action}:{app_id}",
         ))
         self.action = action

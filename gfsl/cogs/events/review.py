@@ -58,7 +58,7 @@ async def send_overdue(client: discord.Client, guild: discord.Guild, d: dict, ev
 
 class ReviewButton(discord.ui.DynamicItem[discord.ui.Button], template=r"evr:(?P<action>edit|ok|skip):(?P<guild>\d+):(?P<ev>\d+)"):
     LABELS = {"edit": ("Bearbeiten & freigeben", discord.ButtonStyle.primary, "✏️"),
-              "ok": ("So freigeben", discord.ButtonStyle.success, "✅"),
+              "ok": ("So freigeben", discord.ButtonStyle.success, None),
               "skip": ("Diese Woche aussetzen", discord.ButtonStyle.secondary, "⏭️")}
 
     def __init__(self, action: str, guild_id: int, ev_id: str):
@@ -159,6 +159,8 @@ class EventEditModal(discord.ui.Modal):
             msg = await confirm(self.guild, d, ev)
         else:
             await actions.update_message(self.guild, d, ev, new_image=new_image)
+            if moved:
+                await actions.rescheduled(self.guild, d, ev)
             msg = "✅ Gespeichert und Anmeldung aktualisiert."
         if moved:
             msg += f"\n📅 Neuer Termin: {tu.pretty(starts_at)}"

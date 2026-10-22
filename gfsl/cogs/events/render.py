@@ -1,4 +1,6 @@
-"""Darstellung im Stil von Raid-Helper: Teams als Spalten mit Icons, Ersatzfahrer extra, Zähler unten."""
+"""Darstellung im Stil von Raid-Helper: Teams als Spalten mit Icons, Ersatzfahrer extra, Zähler oben."""
+from datetime import datetime
+
 import discord
 
 from . import assign
@@ -30,9 +32,24 @@ def name_of(guild: discord.Guild | None, uid: str, s: dict) -> str:
     return discord.utils.escape_markdown((member.display_name if member else s.get("name")) or uid)[:24]
 
 
-def entry(guild, uid: str, s: dict, emoji: str) -> str:
+HR = "━━━━━━━━━━━━━━━━━━━━━━━━"
+SPACER = "\u200b"
+HOVER_LINK = "https://discord.com"  # Ziel ist egal, es geht um den Tooltip beim Drüberfahren
+
+
+def number(s: dict, hover: bool) -> str:
+    """Anmelde-Nummer; beim Drüberfahren mit der Maus erscheint die genaue Anmeldezeit."""
+    if not hover or not s.get("at"):
+        return f"`{s['order']}`"
+    when = datetime.fromtimestamp(s["at"], tu.TZ)
+    verb = {"yes": "Angemeldet", "maybe": "Vielleicht", "no": "Abgemeldet"}[s["status"]]
+    tip = f"{verb} {tu.WEEKDAYS[when.weekday()]}, {when.strftime('%d.%m.%Y %H:%M:%S')}"
+    return f'[`{s["order"]}`]({HOVER_LINK} "{tip}")'
+
+
+def entry(guild, uid: str, s: dict, emoji: str, hover: bool = True) -> str:
     late = " ⏰" if s.get("late") else ""
-    return f"{emoji} `{s['order']}` **{name_of(guild, uid, s)}**{late}"
+    return f"{emoji} {number(s, hover)} **{name_of(guild, uid, s)}**{late}"
 
 
 def clip(lines: list[str], limit: int = 1024) -> str:
@@ -43,20 +60,32 @@ def clip(lines: list[str], limit: int = 1024) -> str:
     return cut + f"\n… (+{text.count(chr(10)) - cut.count(chr(10))})"
 
 
-def event_embed(guild: discord.Guild | None, d: dict, ev: dict) -> discord.Embed:
+def spacer(embed: discord.Embed, name: str = SPACER):
+    embed.add_field(name=name, value=SPACER, inline=False)
+
+
+def event_embed(guild: discord.Guild | None, d: dict, ev: dict, hover: bool = True) -> discord.Embed:
     t = times(d, ev)
     c = counts(ev)
     title = D.field(d, ev, "title")
     desc = D.field(d, ev, "description")
     start_ts, deadline_ts = int(t["start"].timestamp()), int(t["deadline"].timestamp())
+    deadline_passed = tu.now() >= t["deadline"]
 
-    info = [
-        f"👥 **{c['yes']}** angemeldet",
-        f"📅 <t:{start_ts}:D>  🕗 <t:{start_ts}:t>  ⏳ <t:{start_ts}:R>",
-        f"📝 Anmeldefrist: <t:{deadline_ts}:f>" + (" **(abgelaufen – Q-Sperre)**" if tu.now() >= t["deadline"] else f" (<t:{deadline_ts}:R>)"),
+    # Kopf: großer Titel, Beschreibung, Infoblock zwischen Trennlinien
+    head = [f"# 🏁 {title}"]
+    if desc:
+        head += [desc]
+    head += [
+        "",
+        HR,
+        f"📅 **<t:{start_ts}:D>**　🕗 **<t:{start_ts}:t> Uhr**　⏳ <t:{start_ts}:R>",
+        f"📝 Anmeldefrist: **<t:{deadline_ts}:f>** "
+        + ("· **abgelaufen – Q-Sperre**" if deadline_passed else f"(<t:{deadline_ts}:R>)"),
+        f"👥 **{c['yes']}** angemeldet　❔ {c['maybe']} vielleicht　❌ {c['no']} abgemeldet",
+        HR,
     ]
-    embed = discord.Embed(color=COLOR.get(ev["status"], 0xE10600), title=f"🏁 {title}"[:256],
-                          description=(f"{desc}\n\n" if desc else "") + "\n".join(info))
+    embed = discord.Embed(color=COLOR.get(ev["status"], 0xE10600), description="\n".join(head)[:4096])
 
     signups = sorted(ev["signups"].items(), key=lambda e: e[1]["order"])
     yes = [(uid, s) for uid, s in signups if s["status"] == "yes"]
@@ -64,35 +93,45 @@ def event_embed(guild: discord.Guild | None, d: dict, ev: dict) -> discord.Embed
     reserves = [k for k in assign.classes(d) if k["kind"] == "reserve"]
     team_by_id = {k["id"]: k for k in teams}
 
-    for team in teams:
-        lines = [entry(guild, uid, s, team["emoji"]) for uid, s in yes if s["class_id"] == team["id"]]
+    # Stammfahrer: 2 Teams pro Reihe, Abstand zwischen den Reihen
+    for n, team in enumerate(teams):
+        lines = [entry(guild, uid, s, team["emoji"], hover) for uid, s in yes if s["class_id"] == team["id"]]
         subs = [(uid, s) for uid, s in yes if ev["assignments"].get(uid, {}).get("class_id") == team["id"]]
-        lines += [f"🔁 `{s['order']}` **{name_of(guild, uid, s)}**" for uid, s in subs]
+        lines += [f"🔁 {number(s, hover)} **{name_of(guild, uid, s)}**" for uid, s in subs]
         embed.add_field(name=f"{team['emoji']} {team['name']} ({len(lines)}/{team['seats']})"[:256], value=clip(lines), inline=True)
+        if n % 2 == 1 or n == len(teams) - 1:
+            spacer(embed)
 
+    # Ersatzfahrer: eigener Abschnitt
     for res in reserves:
         lines = []
         for uid, s in yes:
             if s["class_id"] != res["id"]:
                 continue
             target = team_by_id.get(ev["assignments"].get(uid, {}).get("class_id"))
-            marker = f" → {target['emoji']}" if target else (" 🚫" if ev.get("deadline_done") else "")
-            lines.append(entry(guild, uid, s, res["emoji"]) + marker)
-        embed.add_field(name=f"{res['emoji']} {res['name']} ({len(lines)})"[:256], value=clip(lines), inline=True)
+            marker = f" → {target['emoji']} {target['name']}" if target else (" 🚫" if ev.get("deadline_done") else "")
+            lines.append(entry(guild, uid, s, res["emoji"], hover) + marker)
+        spacer(embed, name=HR)
+        embed.add_field(name=f"{res['emoji']} {res['name']} ({len(lines)})"[:256], value=clip(lines), inline=False)
 
     for status, label in (("maybe", "❔ Vielleicht"), ("no", "❌ Abgemeldet")):
-        people = [f"`{s['order']}` **{name_of(guild, uid, s)}**" for uid, s in signups if s["status"] == status]
+        people = [f"{number(s, hover)} **{name_of(guild, uid, s)}**" for uid, s in signups if s["status"] == status]
         if people:
             embed.add_field(name=f"{label} ({len(people)})", value=clip([", ".join(people)]), inline=False)
 
     if url := D.image_url(D.field(d, ev, "image")):
+        spacer(embed)
         embed.set_image(url=url)
-    footer = f"✅ {c['yes']} angemeldet · ❔ {c['maybe']} vielleicht · ❌ {c['no']} abgemeldet"
     if ev["status"] == "closed":
-        footer = "🔒 Anmeldung geschlossen · " + footer
+        embed.set_footer(text="🔒 Anmeldung geschlossen")
     elif ev["status"] == "planned":
-        footer = f"🗓️ Wird am {t['post'].strftime('%d.%m. um %H:%M')} gepostet · Event #{ev['id']}"
-    embed.set_footer(text=footer)
+        embed.set_footer(text=f"🗓️ Wird am {t['post'].strftime('%d.%m. um %H:%M')} gepostet · Event #{ev['id']}")
+    else:
+        embed.set_footer(text="Anmelden · Vielleicht · Abmelden – mit den Buttons unten")
+
+    # Discord erlaubt 6000 Zeichen pro Embed: bei sehr vielen Anmeldungen ohne Hover-Zeiten
+    if hover and len(embed) > 5900:
+        return event_embed(guild, d, ev, hover=False)
     return embed
 
 

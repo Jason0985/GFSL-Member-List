@@ -318,7 +318,7 @@ class ImportView(discord.ui.View):
             msg += "\n" + "\n".join(f"⚠️ {p}" for p in problems[:20])
         await interaction.edit_original_response(content=msg[:2000], view=None)
 
-    @discord.ui.button(label="Alle übernehmen", style=discord.ButtonStyle.success, emoji="✅")
+    @discord.ui.button(label="Alle übernehmen", style=discord.ButtonStyle.success)
     async def all_(self, interaction: discord.Interaction, _):
         await self.finish(interaction, only_new=False)
 

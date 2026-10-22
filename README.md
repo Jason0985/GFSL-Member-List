@@ -256,6 +256,7 @@ Verpasst der Bot einen Zeitpunkt (z. B. Neustart), holt er ihn beim nächsten Du
 
 | Befehl | Was er macht |
 |---|---|
+| **⚙️-Button an der Anmeldung** | Nur für Admins: Titel, Beschreibung, Start und Bild direkt am Event ändern. Wird der Start verschoben, berechnet der Bot Frist, Q-Sperren und Einteilung neu. |
 | `/event teilnehmer eintrag: fahrer: status:` | Jemanden an-/abmelden oder austragen, z. B. wenn er per Nachricht Bescheid gegeben hat. |
 | `/event neu_einteilen` | Ersatzfahrer komplett neu auslosen. |
 | `/anwesenheit [vorlage] [oeffentlich]` | Alle Fahrer nach Anwesenheit sortiert (oben 100 %), mit ✅ angemeldet, ❔ vielleicht, ❌ abgemeldet, ➖ keine Rückmeldung, ⏰ zu spät. Darunter eine eigene Liste „Noch nie angemeldet“. |
