@@ -354,6 +354,22 @@ def number_chunks(free: list[int]) -> list[list[int]]:
     return [free[i:i + 25] for i in range(0, len(free), 25)]
 
 
+def number_ranges(numbers: list[int]) -> str:
+    """[1, 3, 4, 5, 6, 10] -> „1, 3–6, 10“"""
+    parts = []
+    start = prev = None
+    for n in numbers:
+        if prev is not None and n == prev + 1:
+            prev = n
+            continue
+        if start is not None:
+            parts.append(str(start) if start == prev else f"{start}–{prev}")
+        start = prev = n
+    if start is not None:
+        parts.append(str(start) if start == prev else f"{start}–{prev}")
+    return ", ".join(parts)
+
+
 def build_number_page(s: Session, view: Overlay) -> discord.Embed:
     page_index = s.page
     q = s.pages[page_index]["questions"][0]
@@ -361,7 +377,6 @@ def build_number_page(s: Session, view: Overlay) -> discord.Embed:
     d = data.get(s.guild_id)
     chosen = s.answers.get(k)
     free = drivers.free_numbers(d, str(s.user_id))
-    taken = sorted(drivers.taken_numbers(d, str(s.user_id)))
     chunks = number_chunks(free)
 
     if s.number_chunk is None or s.number_chunk >= len(chunks):
@@ -371,9 +386,9 @@ def build_number_page(s: Session, view: Overlay) -> discord.Embed:
     if q["hint"]:
         desc.append(q["hint"])
     desc.append(f"Gewählt: **#{chosen}**" if chosen is not None else "Wähle unten eine der freien Nummern.")
-    if taken:
-        txt = ", ".join(map(str, taken))
-        desc.append(f"Bereits vergeben: {txt if len(txt) < 900 else txt[:900] + ' …'}")
+    if free:
+        txt = number_ranges(free)
+        desc.append(f"**Freie Nummern ({len(free)}):** {txt if len(txt) < 900 else txt[:900] + ' …'}")
 
     async def go_next(i: discord.Interaction):
         if s.page == page_index:
