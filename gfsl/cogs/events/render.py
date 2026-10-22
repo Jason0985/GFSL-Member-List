@@ -32,7 +32,6 @@ def name_of(guild: discord.Guild | None, uid: str, s: dict) -> str:
     return discord.utils.escape_markdown((member.display_name if member else s.get("name")) or uid)[:24]
 
 
-HR = "━━━━━━━━━━━━━━━━━━━━━━━━"
 SPACER = "\u200b"
 HOVER_LINK = "https://discord.com"  # Ziel ist egal, es geht um den Tooltip beim Drüberfahren
 
@@ -72,17 +71,17 @@ def event_embed(guild: discord.Guild | None, d: dict, ev: dict, hover: bool = Tr
     start_ts, deadline_ts = int(t["start"].timestamp()), int(t["deadline"].timestamp())
     deadline_passed = tu.now() >= t["deadline"]
 
-    # Kopf: großer Titel, Beschreibung, Infoblock zwischen Trennlinien
+    # Kopf: großer Titel, Beschreibung, Infoblock – getrennt nur durch Abstand
+    # (Leerzeilen am Ende kürzt Discord weg, daher ein unsichtbares Zeichen als letzte Zeile)
     head = [f"# 🏁 {title}"]
     if desc:
         head += [desc]
     head += [
         "",
-        HR,
         f"📅 **<t:{start_ts}:D>**　🕗 **<t:{start_ts}:t> Uhr**　⏳ <t:{start_ts}:R>",
         f"📝 Anmeldefrist: **<t:{deadline_ts}:f>** "
         + ("· **abgelaufen – Q-Sperre**" if deadline_passed else f"(<t:{deadline_ts}:R>)"),
-        HR,
+        SPACER,
     ]
     embed = discord.Embed(color=COLOR.get(ev["status"], 0xE10600), description="\n".join(head)[:4096])
 
@@ -110,7 +109,7 @@ def event_embed(guild: discord.Guild | None, d: dict, ev: dict, hover: bool = Tr
             target = team_by_id.get(ev["assignments"].get(uid, {}).get("class_id"))
             marker = f" → {target['emoji']} {target['name']}" if target else (" 🚫" if ev.get("deadline_done") else "")
             lines.append(entry(guild, uid, s, res["emoji"], hover) + marker)
-        spacer(embed, name=HR)
+        spacer(embed)  # Abstand zwischen Stammfahrern und Ersatzfahrern
         embed.add_field(name=f"{res['emoji']} {res['name']} ({len(lines)})"[:256], value=clip(lines), inline=False)
 
     for status, label in (("maybe", "❔ Vielleicht"), ("no", "❌ Abgemeldet")):
