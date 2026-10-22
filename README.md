@@ -6,6 +6,7 @@ Ein Discord-Bot für die GFSL, aufgeteilt in Module. Jedes Modul übernimmt eine
 |---|---|---|
 | **Ersatzfahrer** | `gfsl/cogs/ersatzfahrer.py` | Postet alle Mitglieder einer Rolle als Liste und hält sie automatisch aktuell. |
 | **Verify** | `gfsl/cogs/verify/` | Verifizierung per Formular, Fahrernummern, automatische Nicknames, Fahrerliste mit Flaggen, Import der Melpo-Altdaten. |
+| **Anmeldung** | `gfsl/cogs/events/` | Anmelde-Bot wie Raid-Helper: Rennkalender, automatisches Posten, Teams/Ersatzfahrer, Q-Sperre, Einteilung, Anwesenheit. |
 
 ## Aufbau
 
@@ -23,6 +24,15 @@ gfsl/
       flow.py               Ablauf für den User: Start-Button → Formular → Overlay → Abschicken
       profile.py            /profil: verifizierte Fahrer tragen Flagge und Plattform selbst nach
       option_roles.py       Rollen je Antwort (z. B. Plattform-Rollen)
+    events/                 Anmelde-Bot
+      commands.py           Befehle /anmeldung, /vorlage, /kalender, /event, /anwesenheit + Zeitplaner (jede Minute)
+      actions.py            Posten, An-/Abmelde-Buttons, Frist, Erinnerung, Schließen
+      assign.py             Teams/Ersatzfahrer und zufällige Einteilung in freie Cockpits
+      render.py             Darstellung wie Raid-Helper
+      review.py             Freigabe per DM vor dem Posten, Bearbeiten-Dialog
+      template_editor.py    /vorlage bearbeiten
+      attendance.py         Anwesenheits-Statistik
+      timeutil.py, data.py  deutsche Zeit (Sommer-/Winterzeit), gespeicherte Daten
       review.py             Mod-Kanal: Antrag mit Akzeptieren/Ablehnen
       drivers.py            Fahrernummern, Nicknames, Fahrerliste
       questions.py          Fragetypen, Prüfung, Standardfragen
@@ -38,6 +48,7 @@ gfsl/
    **Server Members Intent** und **Message Content Intent** einschalten. Den Message Content Intent braucht der Import, um die Nachrichten des Melpo-Bots lesen zu können.
 2. **Einladen:** *OAuth2 → URL Generator* → Scopes `bot` und `applications.commands`.
    Rechte: Kanäle ansehen, Nachrichten senden, Links einbetten, Dateien anhängen, Nachrichtenverlauf lesen, Rollen verwalten, Nicknames verwalten.
+   Für den Anmelde-Bot zusätzlich **„Erwähnen @everyone, @here und alle Rollen“**, damit er auch Rollen pingen kann, die nicht für alle erwähnbar sind.
 3. **Rollenreihenfolge:** In den Servereinstellungen die Bot-Rolle **über** die Rollen der Fahrer ziehen, sonst kann der Bot weder Nicknames setzen noch Rollen vergeben. Den Server-Owner kann grundsätzlich kein Bot umbenennen.
 4. **Starten** (Python 3.10 oder neuer):
    ```bash
@@ -185,3 +196,66 @@ Der Bot liest die alten Nachrichten im Kanal vom ältesten bis zum neuesten Eint
 - Stehen die Nummern schon in den Nicknames (`#17 | Name`), geht auch `/fahrer import_nicknames rolle:@Fahrer`.
 
 Rollen und Nicknames werden beim Import **nicht** verändert. Die Plattform-Rollen vergibst du danach mit `/fahrer rollen_sync`. Erkennt der Bot nichts, schick ein Beispiel einer alten Melpo-Nachricht (Screenshot oder kopierter Text), dann lässt sich die Erkennung in `legacy_import.py` anpassen.
+
+## Anmelde-Bot (Rennanmeldung wie Raid-Helper)
+
+### 1. Einmal einrichten
+
+```
+/anmeldung klasse_neu rolle:@Ferrari art:Team emoji::ferrari: plaetze:2
+/anmeldung klasse_neu rolle:@Haas art:Team emoji::haas:
+...                                   (je Team eine)
+/anmeldung klasse_neu rolle:@Ersatzfahrer art:Ersatzfahrer emoji::reserve:
+/vorlage erstellen name:Liga kanal:#anmeldung
+```
+
+- **Klassen** sind die Rollen, mit denen man sich anmelden kann. Beim Anmelden schaut der Bot, welche Rolle der Fahrer hat, und sortiert ihn in die passende Spalte. Teams kommen vor Ersatzfahrern. Server-Emojis gehen als Icon (`:ferrari:` im Befehl tippen).
+- In der **Vorlage** steht alles, was bei jedem Rennen gleich ist:
+  - Kanal und Rollen, die gepingt werden
+  - Beschreibung und Bild (`/vorlage bild`)
+  - Uhrzeit des Rennens
+  - wann gepostet wird, z. B. „3 Tage vorher um 10:00“
+  - Anmeldefrist, z. B. „am Renntag um 15:00“
+  - Freigabe per DM: ja/nein, wer die DM bekommt und wie viele Stunden vorher
+  - Erinnerung an Fahrer ohne Rückmeldung (optional)
+- **Vorschau** im Vorlagen-Editor zeigt, wie die Anmeldung aussieht.
+
+### 2. Season / Kalender
+
+```
+/kalender hinzufuegen vorlage:Liga datum:16.10.2026 titel:Abu Dhabi GP bild:<optional>
+/kalender woechentlich vorlage:Liga erstes_datum:16.10.2026 anzahl:10     (Platzhalter „Rennen 1..10“)
+/kalender liste
+```
+
+| Befehl | Was er macht |
+|---|---|
+| `/kalender bearbeiten` | Titel, Beschreibung, Datum und Bild ändern. Speichern zählt als Freigabe. |
+| `/kalender verschieben eintrag: tage:7` | Verschiebt das Rennen. **Alle späteren Rennen der Vorlage rutschen mit** (`nachfolgende:False` = nur dieses). |
+| `/kalender aussetzen` | Rennen wird nicht gepostet, die anderen bleiben, wo sie sind. |
+| `/kalender freigeben` / `posten` | So freigeben bzw. sofort posten. |
+| `/kalender entfernen` | Rennen löschen (eine gepostete Anmeldung wird mitgelöscht). |
+
+### 3. Was automatisch passiert
+
+1. **Freigabe** (wenn in der Vorlage an): Vor dem Posten bekommst du eine **DM mit Vorschau** und den Buttons *Bearbeiten & freigeben*, *So freigeben* und *Diese Woche aussetzen*. **Ohne Freigabe wird nichts gepostet.** Zum Post-Zeitpunkt kommt noch einmal eine Erinnerung. Sobald du freigibst, wird sofort gepostet.
+2. **Posten** zur eingestellten Zeit im Kanal der Vorlage, mit Ping der Rollen und den Buttons **Anmelden / Vielleicht / Abmelden**.
+3. **Übersicht:** Teams als Spalten mit Icons und Plätzen (`Ferrari (2/2)`), eine eigene Spalte für Ersatzfahrer, darunter *Vielleicht* und *Abgemeldet*. Gezählt wird angemeldet / vielleicht / abgemeldet, und „vielleicht“ zählt nicht als angemeldet.
+4. **Anmeldefrist:** Wer sich danach anmeldet, wird trotzdem eingetragen, bekommt aber eine **Q-Sperre**: Hinweis beim Klick, eine DM und ein ⏰ in der Übersicht.
+5. **Einteilung:** Zur Frist werden die angemeldeten Ersatzfahrer **zufällig** auf die freien Cockpits verteilt (freie Plätze = Plätze minus angemeldete Stammfahrer). Darunter erscheint eine Extra-Nachricht mit der Einteilung, der Warteliste und den Q-Sperren.
+   - Meldet sich danach noch jemand an oder ab, wird automatisch nachgetragen, und die Betroffenen werden angepingt.
+   - Stammfahrer auf „vielleicht“ zählen als nicht da, ihr Cockpit wird also vergeben.
+6. **Start des Rennens:** Die Anmeldung schließt, die Buttons verschwinden.
+
+Verpasst der Bot einen Zeitpunkt (z. B. Neustart), holt er ihn beim nächsten Durchlauf nach. Alle Zeiten sind deutsche Zeit, Sommer- und Winterzeit inklusive.
+
+### 4. Laufende Events und Statistik
+
+| Befehl | Was er macht |
+|---|---|
+| `/event teilnehmer eintrag: fahrer: status:` | Jemanden an-/abmelden oder austragen, z. B. wenn er per Nachricht Bescheid gegeben hat. |
+| `/event neu_einteilen` | Ersatzfahrer komplett neu auslosen. |
+| `/anwesenheit [vorlage] [oeffentlich]` | Alle Fahrer nach Anwesenheit sortiert (oben 100 %), mit ✅ angemeldet, ❔ vielleicht, ❌ abgemeldet, ➖ keine Rückmeldung, ⏰ zu spät. Darunter eine eigene Liste „Noch nie angemeldet“. |
+
+Gezählt werden alle vergangenen Rennen und alle Mitglieder, die gerade eine Anmelde-Rolle haben. Wer erst später dazugekommen ist, hat dadurch einen niedrigeren Wert.
+

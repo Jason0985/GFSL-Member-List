@@ -20,6 +20,16 @@ def is_admin(interaction: discord.Interaction) -> bool:
     return bool(rid) and any(r.id == rid for r in getattr(interaction.user, "roles", []))
 
 
+def is_admin_member(member: discord.Member | None) -> bool:
+    """Für Stellen ohne Server-Kontext, z. B. Buttons in einer DM."""
+    if member is None:
+        return False
+    if member.guild_permissions.manage_guild:
+        return True
+    rid = admin_role_id(member.guild.id)
+    return bool(rid) and member.get_role(rid) is not None
+
+
 def require_admin(interaction: discord.Interaction) -> bool:
     """Für Cog.interaction_check: wirft NotAdmin, damit der User eine klare Meldung bekommt."""
     if not is_admin(interaction):

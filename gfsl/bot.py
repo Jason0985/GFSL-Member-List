@@ -12,6 +12,7 @@ log = logging.getLogger("gfsl")
 EXTENSIONS = [
     "gfsl.cogs.ersatzfahrer",  # automatische Ersatzfahrer-Liste
     "gfsl.cogs.verify",        # Verifizierung, Fahrernummern, Fahrerliste, Melpo-Import
+    "gfsl.cogs.events",        # Anmelde-Bot: Rennkalender, An-/Abmeldung, Ersatzfahrer-Einteilung, Anwesenheit
 ]
 
 
