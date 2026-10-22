@@ -5,7 +5,7 @@ Erkannt werden zwei Arten von Nachrichten:
   * Liste     – Zeilen wie „#17 🇩🇪 Wenig-Luca @User“ (eine Zeile = ein Fahrer)
 Spätere Nachrichten überschreiben frühere, so landet der aktuelle Stand in der Datenbank.
 Vor dem Übernehmen gibt es immer eine Vorschau mit CSV-Datei, die man in Excel prüfen und korrigiert per
-/fahrer import_csv wieder hochladen kann.
+/verify fahrer import_csv wieder hochladen kann.
 """
 import csv
 import io
@@ -289,7 +289,7 @@ def preview_embed(records: list[Record], guild: discord.Guild, d: dict, read_inf
                      + (f" ⚠️ {'; '.join(r.notes)}" if r.notes else ""))
     if len(records) > 15:
         lines.append(f"… und {len(records) - 15} weitere (siehe CSV)")
-    lines += ["", "Bitte die CSV prüfen. Passt etwas nicht, korrigieren und mit `/fahrer import_csv` hochladen. "
+    lines += ["", "Bitte die CSV prüfen. Passt etwas nicht, korrigieren und mit `/verify fahrer import_csv` hochladen. "
                   "Rollen und Nicknames werden beim Import **nicht** verändert."]
     return discord.Embed(color=Colors.info, title="📥 Import-Vorschau", description="\n".join(lines)[:4096])
 

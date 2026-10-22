@@ -66,8 +66,8 @@ async def set_nickname(member: discord.Member, template: str, drv: dict) -> str 
 
 
 def profile_value(d: dict, guild: discord.Guild | None, uid: str, key: str) -> str | None:
-    """Plattform bzw. Flagge eines Fahrers. Sind der Frage Rollen zugeordnet (/fragen rollen), zählt die Rolle,
-    die er gerade hat. Sonst der gespeicherte Wert (Formular, Import, /profil, /fahrer setzen)."""
+    """Plattform bzw. Flagge eines Fahrers. Sind der Frage Rollen zugeordnet (/verify fragen rollen), zählt die Rolle,
+    die er gerade hat. Sonst der gespeicherte Wert (Formular, Import, /verify-profil, /verify fahrer setzen)."""
     q = next((q for q in d["questions"] if q["purpose"] == key and q.get("option_roles")), None)
     member = guild.get_member(int(uid)) if q and guild else None
     if member:

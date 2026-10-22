@@ -59,14 +59,13 @@ def check_emoji(text: str) -> str:
 
 
 class EventsCog(commands.Cog):
-    anmeldung = app_commands.Group(name="anmeldung", description="Anmelde-Bot: Rollen/Teams für die Anmeldung",
+    # Alles unter /anmeldung (Admins): klasse, vorlage, kalender, event, anwesenheit
+    anmeldung = app_commands.Group(name="anmeldung", description="Anmelde-Bot: Teams, Vorlagen, Kalender, Events, Anwesenheit",
                                    default_permissions=ADMIN, guild_only=True)
-    vorlage = app_commands.Group(name="vorlage", description="Anmelde-Bot: Vorlagen (was bei jedem Rennen gleich ist)",
-                                 default_permissions=ADMIN, guild_only=True)
-    kalender = app_commands.Group(name="kalender", description="Anmelde-Bot: Rennkalender / Season",
-                                  default_permissions=ADMIN, guild_only=True)
-    event = app_commands.Group(name="event", description="Anmelde-Bot: laufende Events verwalten",
-                               default_permissions=ADMIN, guild_only=True)
+    klasse = app_commands.Group(name="klasse", description="Rollen/Teams, mit denen man sich anmelden kann", parent=anmeldung)
+    vorlage = app_commands.Group(name="vorlage", description="Vorlagen (was bei jedem Rennen gleich ist)", parent=anmeldung)
+    kalender = app_commands.Group(name="kalender", description="Rennkalender / Season", parent=anmeldung)
+    event = app_commands.Group(name="event", description="Laufende Events verwalten", parent=anmeldung)
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -128,17 +127,17 @@ class EventsCog(commands.Cog):
 
     # ---------- /anmeldung: Klassen ----------
 
-    @anmeldung.command(name="klassen", description="Zeigt alle Rollen/Teams, mit denen man sich anmelden kann")
+    @klasse.command(name="liste", description="Zeigt alle Rollen/Teams, mit denen man sich anmelden kann")
     async def klassen(self, interaction: discord.Interaction):
         d = D.get(interaction.guild_id)
         if not assign.classes(d):
-            return await reply(interaction, "Noch keine. Lege sie mit `/anmeldung klasse_neu` an – je Team eine und eine für Ersatzfahrer.")
+            return await reply(interaction, "Noch keine. Lege sie mit `/anmeldung klasse neu` an – je Team eine und eine für Ersatzfahrer.")
         lines = [f"{c['emoji']} **{c['name']}** – <@&{c['role_id']}> · "
                  + (f"Team, {c['seats']} Plätze" if c["kind"] == "team" else "Ersatzfahrer") for c in assign.classes(d)]
         await interaction.response.send_message(embed=discord.Embed(color=0x3B82F6, title="🏎️ Anmelde-Klassen", description="\n".join(lines)),
                                                 ephemeral=True)
 
-    @anmeldung.command(name="klasse_neu", description="Rolle hinzufügen, mit der man sich anmelden kann (z. B. Team Ferrari)")
+    @klasse.command(name="neu", description="Rolle hinzufügen, mit der man sich anmelden kann (z. B. Team Ferrari)")
     @app_commands.describe(rolle="Discord-Rolle (z. B. Ferrari oder Ersatzfahrer)", art="Team oder Ersatzfahrer",
                            emoji="Icon, z. B. 🏎️ oder ein Server-Emoji wie :ferrari:", plaetze="Cockpits im Team (Standard 2)",
                            name="Anzeigename (Standard: Rollenname)", position="Stelle in der Übersicht (Standard: hinten)")
@@ -163,7 +162,7 @@ class EventsCog(commands.Cog):
         storage.save()
         await reply(interaction, f"✅ {icon} **{c['name']}** ({rolle.mention}) hinzugefügt.")
 
-    @anmeldung.command(name="klasse_bearbeiten", description="Icon, Plätze, Name oder Position einer Klasse ändern")
+    @klasse.command(name="bearbeiten", description="Icon, Plätze, Name oder Position einer Klasse ändern")
     @app_commands.autocomplete(klasse=class_autocomplete)
     async def klasse_bearbeiten(self, interaction: discord.Interaction, klasse: int, emoji: str | None = None,
                                 plaetze: app_commands.Range[int, 1, 10] | None = None,
@@ -190,7 +189,7 @@ class EventsCog(commands.Cog):
         await self.refresh_open_events(interaction.guild, d)
         await reply(interaction, f"✅ {c['emoji']} **{c['name']}** gespeichert.")
 
-    @anmeldung.command(name="klasse_entfernen", description="Klasse entfernen (Anmeldungen bleiben in der Statistik)")
+    @klasse.command(name="entfernen", description="Klasse entfernen (Anmeldungen bleiben in der Statistik)")
     @app_commands.autocomplete(klasse=class_autocomplete)
     async def klasse_entfernen(self, interaction: discord.Interaction, klasse: int):
         d = D.get(interaction.guild_id)
@@ -206,7 +205,7 @@ class EventsCog(commands.Cog):
             if ev["status"] == "posted":
                 await actions.refresh(guild, d, ev)
 
-    # ---------- /vorlage ----------
+    # ---------- /anmeldung vorlage ----------
 
     @vorlage.command(name="erstellen", description="Neue Vorlage anlegen (z. B. „Liga-Rennen“)")
     @app_commands.describe(name="Name der Vorlage", kanal="Kanal, in dem die Anmeldungen gepostet werden")
@@ -216,7 +215,7 @@ class EventsCog(commands.Cog):
         t["channel_id"] = kanal.id
         storage.save()
         editor = TemplateEditor(interaction.guild, interaction.user.id, t["id"])
-        editor.note = "✅ Angelegt. Jetzt Texte & Zeiten einstellen, danach Rennen mit `/kalender` eintragen."
+        editor.note = "✅ Angelegt. Jetzt Texte & Zeiten einstellen, danach Rennen mit `/anmeldung kalender` eintragen."
         await interaction.response.send_message(embed=editor.render(), view=editor, ephemeral=True)
 
     @vorlage.command(name="bearbeiten", description="Einstellungen einer Vorlage ändern")
@@ -246,7 +245,7 @@ class EventsCog(commands.Cog):
     async def vorlage_liste(self, interaction: discord.Interaction):
         d = D.get(interaction.guild_id)
         if not d["templates"]:
-            return await reply(interaction, "Noch keine Vorlagen. Lege eine mit `/vorlage erstellen` an.")
+            return await reply(interaction, "Noch keine Vorlagen. Lege eine mit `/anmeldung vorlage erstellen` an.")
         lines = []
         for tid, t in d["templates"].items():
             planned = sum(1 for e in d["events"].values() if e["template_id"] == tid and e["status"] == "planned")
@@ -265,7 +264,7 @@ class EventsCog(commands.Cog):
         storage.save()
         await reply(interaction, f"🗑️ Vorlage „{name}“ gelöscht. Vergangene Rennen bleiben für die Anwesenheit erhalten.")
 
-    # ---------- /kalender ----------
+    # ---------- /anmeldung kalender ----------
 
     def get_template(self, d: dict, tid: str) -> dict | None:
         t = d["templates"].get(tid)
@@ -330,7 +329,7 @@ class EventsCog(commands.Cog):
         d = D.get(interaction.guild_id)
         evs = [e for e in D.sorted_events(d, vorlage) if alle or e["status"] in ("planned", "posted")]
         if not evs:
-            return await reply(interaction, "Keine Rennen im Kalender. Eintragen mit `/kalender hinzufuegen` oder `/kalender woechentlich`.")
+            return await reply(interaction, "Keine Rennen im Kalender. Eintragen mit `/anmeldung kalender hinzufuegen` oder `/anmeldung kalender woechentlich`.")
         lines = []
         for e in evs:
             ok = " ✋ wartet auf Freigabe" if e["status"] == "planned" and D.template_of(d, e)["review"] and not e["confirmed"] else ""
@@ -428,7 +427,7 @@ class EventsCog(commands.Cog):
                     pass
         await reply(interaction, f"🗑️ **{D.field(d, ev, 'title')}** gelöscht.")
 
-    # ---------- /event ----------
+    # ---------- /anmeldung event ----------
 
     @event.command(name="teilnehmer", description="Jemanden an-/abmelden (z. B. wenn er sich per Nachricht gemeldet hat)")
     @app_commands.choices(status=STATUS_CHOICES)
@@ -473,17 +472,15 @@ class EventsCog(commands.Cog):
         await actions.refresh(interaction.guild, d, ev)
         await interaction.followup.send("🔁 Neu eingeteilt.", ephemeral=True)
 
-    # ---------- /anwesenheit ----------
+    # ---------- /anmeldung anwesenheit ----------
 
-    @app_commands.command(name="anwesenheit", description="Anwesenheit aller Fahrer in Prozent (vergangene Rennen)")
+    @anmeldung.command(name="anwesenheit", description="Anwesenheit aller Fahrer in Prozent (vergangene Rennen)")
     @app_commands.describe(vorlage="Nur Rennen dieser Vorlage", oeffentlich="Für alle sichtbar posten")
     @app_commands.autocomplete(vorlage=template_autocomplete)
-    @app_commands.default_permissions(manage_guild=True)
-    @app_commands.guild_only()
     async def anwesenheit(self, interaction: discord.Interaction, vorlage: str | None = None, oeffentlich: bool = False):
         d = D.get(interaction.guild_id)
         rows, total = attendance.stats(interaction.guild, d, vorlage)
         if not rows:
-            return await reply(interaction, "Keine Fahrer gefunden. Sind Anmelde-Rollen eingetragen (`/anmeldung klassen`)?")
+            return await reply(interaction, "Keine Fahrer gefunden. Sind Anmelde-Rollen eingetragen (`/anmeldung klasse liste`)?")
         title = f"Anwesenheit {d['templates'][vorlage]['name']}" if vorlage in d["templates"] else "Anwesenheit"
         await interaction.response.send_message(embeds=attendance.embeds(rows, total, title), ephemeral=not oeffentlich)

@@ -244,9 +244,9 @@ class SetupWizard(discord.ui.View):
             "**Admin-Rolle zum Bearbeiten mit dem Bot:**\n"
             f"• {role_status(self.guild, s['mod_role_id'], assigned=False)}\n"
             "Wer diese Rolle hat, darf **alles** mit dem Bot: alle Befehle, Anträge akzeptieren/ablehnen, Fahrer bearbeiten. "
-            "Alle anderen können nur sich selbst verifizieren und mit `/profil` ihre Flagge/Plattform eintragen. "
+            "Alle anderen können nur sich selbst verifizieren und mit `/verify-profil` ihre Flagge/Plattform eintragen. "
             "Leute mit „Server verwalten“ dürfen immer alles, auch ohne diese Rolle.\n\n"
-            "Zum Leeren die Auswahl im Menü entfernen. Rollen je Antwort (z. B. PlayStation → @PS-Fahrer) stellst du mit `/fragen rollen` ein."
+            "Zum Leeren die Auswahl im Menü entfernen. Rollen je Antwort (z. B. PlayStation → @PS-Fahrer) stellst du mit `/verify fragen rollen` ein."
         )
         self.add_role_select("verified_role_id", "Rolle bei Freigabe …", 0)
         self.add_role_select("remove_role_id", "Rolle, die entfernt wird …", 1)
@@ -272,8 +272,8 @@ class SetupWizard(discord.ui.View):
         lines = [f"**{n + 1}.** {q['label']}" for n, q in enumerate(qs)]
         embed.description = (
             (("\n".join(lines)) if qs else "Noch keine Fragen.")
-            + f"\n\n**{len(qs)}/{MAX_QUESTIONS} Fragen.** Fragen änderst du mit `/fragen neu`, `/fragen bearbeiten`, "
-            "`/fragen verschieben` und `/fragen entfernen`, Rollen je Antwort (z. B. Plattform) mit `/fragen rollen`. Mit **Testlauf** gehst du die Verifizierung selbst durch, "
+            + f"\n\n**{len(qs)}/{MAX_QUESTIONS} Fragen.** Fragen änderst du mit `/verify fragen neu`, `/verify fragen bearbeiten`, "
+            "`/verify fragen verschieben` und `/verify fragen entfernen`, Rollen je Antwort (z. B. Plattform) mit `/verify fragen rollen`. Mit **Testlauf** gehst du die Verifizierung selbst durch, "
             "ohne dass etwas gespeichert wird."
         )
 

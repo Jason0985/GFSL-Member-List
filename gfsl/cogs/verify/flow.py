@@ -112,7 +112,7 @@ async def start(interaction: discord.Interaction, preview: bool = False):
     if not preview and (reason := start_blocker(d, interaction.user.id)):
         return await interaction.response.send_message(reason, ephemeral=True)
     if preview and not d["questions"]:
-        return await interaction.response.send_message("Noch keine Fragen. Nutze `/fragen standard` oder `/fragen neu`.", ephemeral=True)
+        return await interaction.response.send_message("Noch keine Fragen. Nutze `/verify fragen standard` oder `/verify fragen neu`.", ephemeral=True)
 
     session = get_session(interaction.guild_id, interaction.user.id, preview)
     if session is None or preview:

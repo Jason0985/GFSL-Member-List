@@ -1,7 +1,7 @@
 """Profil für schon verifizierte Fahrer: Flagge und Plattform selbst nachtragen oder ändern.
 
-Öffnet sich mit /profil oder wenn ein verifizierter Fahrer auf den Start-Button klickt. Die Auswahl-Optionen
-kommen aus den Verify-Fragen mit dem Feld „Flagge“ bzw. „Plattform“. Die passenden Rollen (/fragen rollen)
+Öffnet sich mit /verify-profil oder wenn ein verifizierter Fahrer auf den Start-Button klickt. Die Auswahl-Optionen
+kommen aus den Verify-Fragen mit dem Feld „Flagge“ bzw. „Plattform“. Die passenden Rollen (/verify fragen rollen)
 werden direkt angepasst.
 """
 import discord
@@ -28,7 +28,7 @@ def profile_questions(d: dict, own: bool = True) -> list[dict]:
 
 
 class ProfileModal(discord.ui.Modal):
-    """by_admin=False: der Fahrer selbst (/profil). by_admin=True: ein Admin bearbeitet einen Fahrer (/fahrer bearbeiten),
+    """by_admin=False: der Fahrer selbst (/verify-profil). by_admin=True: ein Admin bearbeitet einen Fahrer (/verify fahrer bearbeiten),
     dann zusätzlich mit Nummer und Name."""
 
     def __init__(self, guild: discord.Guild, user_id: int, by_admin: bool = False):

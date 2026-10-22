@@ -1,4 +1,4 @@
-"""Slash-Befehle des Verify-Moduls: /verify, /fragen, /fahrer"""
+"""Slash-Befehle des Verify-Moduls: /verify, /verify fragen, /verify fahrer"""
 import asyncio
 import logging
 import time
@@ -93,20 +93,19 @@ async def flag_autocomplete(interaction: discord.Interaction, current: str) -> l
 
 
 class VerifyCog(commands.Cog):
-    verify = app_commands.Group(name="verify", description="GFSL Verifizierung einrichten",
+    # Alles unter /verify (Admins), Untergruppen /verify fragen … und /verify fahrer …
+    verify = app_commands.Group(name="verify", description="Verifizierung: Einrichtung, Fragen, Fahrer & Nummern",
                                 default_permissions=ADMIN, guild_only=True)
-    fragen = app_commands.Group(name="fragen", description="Verifizierungsfragen verwalten",
-                                default_permissions=ADMIN, guild_only=True)
-    fahrer = app_commands.Group(name="fahrer", description="Fahrer und Nummern verwalten",
-                                default_permissions=ADMIN, guild_only=True)
+    fragen = app_commands.Group(name="fragen", description="Verifizierungsfragen verwalten", parent=verify)
+    fahrer = app_commands.Group(name="fahrer", description="Fahrer und Nummern verwalten", parent=verify)
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._pending_refresh: dict[int, asyncio.Task] = {}
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        # Alles nur für Admins, außer /profil (jeder Fahrer für sich selbst)
-        if interaction.command and interaction.command.qualified_name == "profil":
+        # Alles nur für Admins, außer /verify-profil (jeder Fahrer für sich selbst)
+        if interaction.command and interaction.command.qualified_name == "verify-profil":
             return True
         return require_admin(interaction)
 
@@ -148,9 +147,9 @@ class VerifyCog(commands.Cog):
         if relevant:
             self.schedule_refresh(after.guild)
 
-    # ---------- /profil (für Fahrer) ----------
+    # ---------- /verify-profil (für Fahrer) ----------
 
-    @app_commands.command(name="profil", description="Deine Flagge und Plattform für die Fahrerliste eintragen oder ändern")
+    @app_commands.command(name="verify-profil", description="Deine Flagge und Plattform für die Fahrerliste eintragen oder ändern")
     @app_commands.guild_only()
     async def profil(self, interaction: discord.Interaction):
         if str(interaction.user.id) not in data.get(interaction.guild_id)["drivers"]:
@@ -178,13 +177,13 @@ class VerifyCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         await interaction.followup.send(await post_panel(interaction.guild, data.get(interaction.guild_id)), ephemeral=True)
 
-    # ---------- /fragen ----------
+    # ---------- /verify fragen ----------
 
     @fragen.command(name="liste", description="Alle aktuellen Fragen anzeigen")
     async def liste(self, interaction: discord.Interaction):
         d = data.get(interaction.guild_id)
         if not d["questions"]:
-            return await reply(interaction, "Noch keine Fragen. Nutze `/fragen standard` oder `/fragen neu`.")
+            return await reply(interaction, "Noch keine Fragen. Nutze `/verify fragen standard` oder `/verify fragen neu`.")
         pages = Q.pages(d["questions"])
         page_of = {q["id"]: n for n, p in enumerate(pages) for q in p["questions"]}
         blocks = []
@@ -252,7 +251,7 @@ class VerifyCog(commands.Cog):
         d = data.get(interaction.guild_id)
         idx = question_index(d, nr)
         if idx is None:
-            return await reply(interaction, "Diese Nummer gibt es nicht. Schau mit `/fragen liste` nach.")
+            return await reply(interaction, "Diese Nummer gibt es nicht. Schau mit `/verify fragen liste` nach.")
         q = dict(d["questions"][idx], options=list(d["questions"][idx]["options"]))
         if typ:
             q["type"] = typ.value
@@ -284,7 +283,7 @@ class VerifyCog(commands.Cog):
         d = data.get(interaction.guild_id)
         idx = question_index(d, nr)
         if idx is None:
-            return await reply(interaction, "Diese Nummer gibt es nicht. Schau mit `/fragen liste` nach.")
+            return await reply(interaction, "Diese Nummer gibt es nicht. Schau mit `/verify fragen liste` nach.")
         q = d["questions"][idx]
         if q["type"] not in option_roles.ROLE_TYPES:
             return await reply(interaction, "Rollen gehen nur bei Fragen vom Typ Auswahl, Flagge oder Ja/Nein.")
@@ -325,10 +324,10 @@ class VerifyCog(commands.Cog):
         d = data.get(interaction.guild_id)
         d["questions"], d["next_question_id"] = Q.default_questions(d["next_question_id"])
         storage.save()
-        await reply(interaction, f"✅ {len(d['questions'])} Standardfragen geladen. Mit `/fragen liste` ansehen "
-                                 "und mit `/fragen bearbeiten` anpassen.")
+        await reply(interaction, f"✅ {len(d['questions'])} Standardfragen geladen. Mit `/verify fragen liste` ansehen "
+                                 "und mit `/verify fragen bearbeiten` anpassen.")
 
-    # ---------- /fahrer ----------
+    # ---------- /verify fahrer ----------
 
     async def refresh_list(self, guild: discord.Guild, d: dict) -> str | None:
         try:
@@ -406,14 +405,14 @@ class VerifyCog(commands.Cog):
         d = data.get(interaction.guild_id)
         questions = option_roles.mapped_questions(d["questions"])
         if not questions:
-            return await reply(interaction, "Noch keine Rollen festgelegt. Erst mit `/fragen rollen` einstellen.")
+            return await reply(interaction, "Noch keine Rollen festgelegt. Erst mit `/verify fragen rollen` einstellen.")
         await interaction.response.defer(ephemeral=True, thinking=True)
         report = await option_roles.sync_all(interaction.guild, d, questions, andere_entfernen)
         err = await self.refresh_list(interaction.guild, d)
         await interaction.followup.send(report.text()[:1900] + (f"\n⚠️ {err}" if err else ""), ephemeral=True)
 
     @fahrer.command(name="fehlende_angaben", description="Zeigt, bei welchen Fahrern Flagge oder Plattform fehlt")
-    @app_commands.describe(oeffentlich="In den Kanal posten und die Fahrer anpingen, damit sie es mit /profil nachtragen")
+    @app_commands.describe(oeffentlich="In den Kanal posten und die Fahrer anpingen, damit sie es mit /verify-profil nachtragen")
     async def fehlende_angaben(self, interaction: discord.Interaction, oeffentlich: bool = False):
         d = data.get(interaction.guild_id)
         lines = []
@@ -425,7 +424,7 @@ class VerifyCog(commands.Cog):
         if not lines:
             return await reply(interaction, "✅ Bei allen Fahrern sind Flagge und Plattform eingetragen.")
         head = (f"**Bei {len(lines)} Fahrer(n) fehlt noch etwas für die Fahrerliste.** "
-                "Bitte mit `/profil` nachtragen (oder auf den Verifizierungs-Button klicken):")
+                "Bitte mit `/verify-profil` nachtragen (oder auf den Verifizierungs-Button klicken):")
         chunks, cur = [], head
         for line in lines:
             if len(cur) + len(line) + 1 > 1900:

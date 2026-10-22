@@ -7,7 +7,7 @@ FLAGS = {
     "Großbritannien": "🇬🇧", "Irland": "🇮🇪", "Dänemark": "🇩🇰", "Schweden": "🇸🇪", "Norwegen": "🇳🇴",
     "Finnland": "🇫🇮", "Polen": "🇵🇱", "Tschechien": "🇨🇿", "Ungarn": "🇭🇺", "Kroatien": "🇭🇷",
     "Türkei": "🇹🇷", "Griechenland": "🇬🇷", "USA": "🇺🇸", "Brasilien": "🇧🇷", "Japan": "🇯🇵",
-    # weitere, falls du eigene Optionen per /fragen angibst
+    # weitere, falls du eigene Optionen per /verify fragen angibst
     "Monaco": "🇲🇨", "Liechtenstein": "🇱🇮", "Slowakei": "🇸🇰", "Slowenien": "🇸🇮", "Serbien": "🇷🇸",
     "Bosnien": "🇧🇦", "Rumänien": "🇷🇴", "Bulgarien": "🇧🇬", "Ukraine": "🇺🇦", "Russland": "🇷🇺",
     "Litauen": "🇱🇹", "Lettland": "🇱🇻", "Estland": "🇪🇪", "Albanien": "🇦🇱", "Kosovo": "🇽🇰",

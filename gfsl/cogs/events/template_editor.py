@@ -1,4 +1,4 @@
-"""/vorlage bearbeiten: alle Einstellungen einer Vorlage in einer privaten Nachricht."""
+"""/anmeldung vorlage bearbeiten: alle Einstellungen einer Vorlage in einer privaten Nachricht."""
 from datetime import timedelta
 
 import discord
@@ -65,7 +65,7 @@ class TemplateEditor(discord.ui.View):
             f"**⏰ Anmelde-Erinnerung:** {remind}",
             f"**Titel (Standard):** {t['title']}",
             f"**Beschreibung:** {(t['description'][:300] + ('…' if len(t['description']) > 300 else '')) or '—'}",
-            f"**Bild:** {'✅' if t['image'] else '—'} (ändern mit `/vorlage bild`)",
+            f"**Bild:** {'✅' if t['image'] else '—'} (ändern mit `/anmeldung vorlage bild`)",
             f"**Event-Uhrzeit:** {t['event_time']}",
             f"**Gepostet:** {days_text(t['post_days_before'], t['post_time'])}",
             f"**Anmeldefrist:** {days_text(t['deadline_days_before'], t['deadline_time'])} – danach Q-Sperre und Einteilung der Ersatzfahrer",

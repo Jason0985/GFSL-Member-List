@@ -34,7 +34,7 @@ class SyncReport:
         if self.unknown:
             self.unknown = list(dict.fromkeys(self.unknown))
             users = " ".join(f"<@{uid}>" for uid in self.unknown[:30]) + (" …" if len(self.unknown) > 30 else "")
-            lines.append(f"❔ {len(self.unknown)} Fahrer ohne Angabe (mit `/fahrer setzen` nachtragen): {users}")
+            lines.append(f"❔ {len(self.unknown)} Fahrer ohne Angabe (mit `/verify fahrer setzen` nachtragen): {users}")
         lines += [f"⚠️ {e}" for e in dict.fromkeys(self.errors)][:10]
         return "\n".join(lines)
 
@@ -144,7 +144,7 @@ def role_warning(guild: discord.Guild, role: discord.Role | None) -> str:
 
 
 class OptionRolesView(discord.ui.View):
-    """/fragen rollen: Option wählen, dann die Rolle dazu."""
+    """/verify fragen rollen: Option wählen, dann die Rolle dazu."""
 
     def __init__(self, guild: discord.Guild, user_id: int, d: dict, question_id: int):
         super().__init__(timeout=900)
